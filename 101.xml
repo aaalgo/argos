@@ -1,0 +1,34 @@
+<argos>
+    <default>
+        <mom>0</mom>
+        <eta>0.0005</eta>
+        <lambda>0.5</lambda>
+        <init>0</init>
+    </default>
+    <node>
+        <type>simple</type>
+        <name>input</name>
+        <batch>64</batch>
+        <train>101.train</train>
+        <test>101.test</test>
+    </node>
+    <node>
+        <type>linear</type>
+        <name>linear</name>
+        <input>input</input>
+        <channel>98</channel>
+    </node>
+    <node>
+        <type>hinge</type>
+        <name>hinge</name>
+        <input>linear</input>
+        <labels>input</labels>
+    </node>
+    <node>
+        <type>labeltap</type>
+        <name>tap</name>
+        <input>hinge</input>
+        <path>101.predict</path>
+    </node>
+</argos>
+
