@@ -35,8 +35,7 @@ namespace argos {
             }
         };
 
-        class SimpleArrayInputNode: public ArrayNode, public LabelInput, public Input {
-
+        class SimpleArrayInputNode: public ArrayNode, public role::LabelInput, public role::Input {
             class Samples {
                 size_t m_dim;
                 vector<int> m_labels;
@@ -79,7 +78,7 @@ namespace argos {
                     return m_dim;
                 }
 
-                void reset (void) {
+                void rewind (void) {
                     m_off = 0;
                 }
 
@@ -131,9 +130,9 @@ namespace argos {
                 m_labels.resize(m_batch);
             }
 
-            void reset (Mode mode) {
+            void rewind (Mode mode) {
                 if (mode == MODE_PREDICT) {
-                    m_test.reset();
+                    m_test.rewind();
                 }
                 else {
                     BOOST_VERIFY(0);    // for now don't support reset for training

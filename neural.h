@@ -133,11 +133,11 @@ namespace argos {
         };
 
         // 
-        class LogPOutputNode: public MaxScoreOutputNode, public Stat {
+        class LogPOutputNode: public MaxScoreOutputNode, public role::Loss {
         public:
             LogPOutputNode (Model *model, Config const &config) 
                 : MaxScoreOutputNode(model, config),
-                  Stat({"loss", "error"})
+                  role::Loss({"loss", "error"})
             {
             }
 
@@ -170,9 +170,8 @@ namespace argos {
                     }
                     x += m_stride;
                 }
-                scores()[0] += -logp;
-                scores()[1] += nmiss;
-                acc() += truth.size();
+                acc(0)(-logp);
+                acc(1)(nmiss);
             }
 
             void update (Mode mode) {
@@ -188,12 +187,12 @@ namespace argos {
             }
         };
 
-        class HingeLossOutputNode: public MaxScoreOutputNode, public Stat {
+        class HingeLossOutputNode: public MaxScoreOutputNode, public role::Loss {
             float m_margin;
         public:
             HingeLossOutputNode (Model *model, Config const &config) 
                 : MaxScoreOutputNode(model, config),
-                  Stat({"loss", "error"}),
+                  role::Loss({"loss", "error"}),
                   m_margin(config.get<float>("margin", 0.25))
             {
             }
@@ -219,9 +218,8 @@ namespace argos {
                     }
                     if (bad) nmiss += 1.0;
                 }
-                scores()[0] += total;
-                scores()[1] += nmiss;
-                acc() += truth.size();
+                acc(0)(total);
+                acc(1)(nmiss);
             }
 
             void update (Mode mode) {
@@ -394,7 +392,7 @@ namespace argos {
 
             void preupdate (Mode mode) {
                 if (mode == MODE_TRAIN) {
-                    if (m_mom == 0) {
+                    if (m_mom == 0) {   // m_mom has to be 0 for verify mode
                         delta().fill(0);
                     }
                     else {
@@ -403,9 +401,6 @@ namespace argos {
                     if (m_lambda) {
                         delta().add_scaled(m_lambda, data());
                     }
-                }
-                else if (mode == MODE_VERIFY) {
-                    delta().fill(0);
                 }
             }
         };
@@ -552,7 +547,7 @@ namespace argos {
                     m_weight = model->createNode<ParamNode>(wconfig);
                     BOOST_VERIFY(m_weight);
                 }
-                add_input(m_weight, "weight");
+                addInput(m_weight, "weight");
 
                 m_bias = nullptr;
                 try {
@@ -569,7 +564,7 @@ namespace argos {
                     m_bias = model->createNode<ParamNode>(bconfig);
                     BOOST_VERIFY(m_bias);
                 }
-                add_input(m_bias, "bias");
+                addInput(m_bias, "bias");
                 BOOST_VERIFY(m_bias->data().size() == m_output_size);
                 BOOST_VERIFY(m_weight->data().size() == m_input_size * m_output_size);
             }

@@ -5,39 +5,30 @@
 
 namespace argos {
 
-    template <typename NODE_TYPE>
-    struct NodeFactoryImpl: public Node::Factory {
-    public:
-        virtual Node *create (Model *model, Config const &config) const {
-            return new NODE_TYPE(model, config);
-        }
-        virtual bool isa (Node const *node) const {
-            return dynamic_cast<NODE_TYPE const*>(node) != 0;
-        }
-    };
-
-    void Model::register_factories () {
-        m_fac["generic"] = new NodeFactoryImpl<Node>;
-        m_fac["id"] = new NodeFactoryImpl<neural::FunctionNode<neural::function::id>>;
-        m_fac["relu"] = new NodeFactoryImpl<neural::FunctionNode<neural::function::relu>>;
-        m_fac["softrelu"] = new NodeFactoryImpl<neural::FunctionNode<neural::function::softrelu>>;
-        m_fac["tanh"] = new NodeFactoryImpl<neural::FunctionNode<neural::function::tanh>>;
-        m_fac["logistic"] = new NodeFactoryImpl<neural::FunctionNode<neural::function::logistic>>;
-        m_fac["param"] = new NodeFactoryImpl<neural::ParamNode>;
-        m_fac["linear"] = new NodeFactoryImpl<neural::LinearNode>;
-        //m_fac["input"] = new NodeFactoryImpl<neural::InputNode>;
-        m_fac["labeltap"] = new NodeFactoryImpl<neural::LabelTap>;
-        //m_fac["gaussian"] = new NodeFactoryImpl<neural::GaussianOutputNode>;
-        m_fac["logp"] = new NodeFactoryImpl<neural::LogPOutputNode>;
-        m_fac["hinge"] = new NodeFactoryImpl<neural::HingeLossOutputNode>;
-        m_fac["window"] = new NodeFactoryImpl<neural::WindowNode>;
-        m_fac["max"] = new NodeFactoryImpl<neural::PoolNode<neural::pool::max>>;
-        m_fac["avg"] = new NodeFactoryImpl<neural::PoolNode<neural::pool::avg>>;
-        m_fac["pad"] = new NodeFactoryImpl<neural::PadNode>;
-        m_fac["softmax"] = new NodeFactoryImpl<neural::SoftMaxNode>;
-        m_fac["dropout"] = new NodeFactoryImpl<neural::DropOutNode>;
-        m_fac["conv"] = new neural::ConvNodeFactory;
-        m_fac["global"] = new neural::GlobalNodeFactory;
-        m_fac["simple"] = new NodeFactoryImpl<neural::SimpleArrayInputNode>;
+    void Model::registerAllFactories () {
+        registerFactory("generic", new NodeFactoryImpl<Node>);
+        registerFactory("id", new NodeFactoryImpl<neural::FunctionNode<neural::function::id>>);
+        registerFactory("relu", new NodeFactoryImpl<neural::FunctionNode<neural::function::relu>>);
+        registerFactory("softrelu", new NodeFactoryImpl<neural::FunctionNode<neural::function::softrelu>>);
+        registerFactory("tanh", new NodeFactoryImpl<neural::FunctionNode<neural::function::tanh>>);
+        registerFactory("logistic", new NodeFactoryImpl<neural::FunctionNode<neural::function::logistic>>);
+        registerFactory("param", new NodeFactoryImpl<neural::ParamNode>);
+        registerFactory("linear", new NodeFactoryImpl<neural::LinearNode>);
+        //registerFactory("input", new NodeFactoryImpl<neural::InputNode>);
+        registerFactory("labeltap", new NodeFactoryImpl<neural::LabelTap>);
+        //registerFactory("gaussian", new NodeFactoryImpl<neural::GaussianOutputNode>);
+        registerFactory("logp", new NodeFactoryImpl<neural::LogPOutputNode>);
+        registerFactory("hinge", new NodeFactoryImpl<neural::HingeLossOutputNode>);
+        registerFactory("window", new NodeFactoryImpl<neural::WindowNode>);
+        registerFactory("max", new NodeFactoryImpl<neural::PoolNode<neural::pool::max>>);
+        registerFactory("avg", new NodeFactoryImpl<neural::PoolNode<neural::pool::avg>>);
+        registerFactory("pad", new NodeFactoryImpl<neural::PadNode>);
+        registerFactory("softmax", new NodeFactoryImpl<neural::SoftMaxNode>);
+        registerFactory("dropout", new NodeFactoryImpl<neural::DropOutNode>);
+        registerFactory("conv", new neural::ConvNodeFactory);
+        registerFactory("global", new neural::GlobalNodeFactory);
+        registerFactory("simple", new NodeFactoryImpl<neural::SimpleArrayInputNode>);
+        registerFactory("svm", new neural::SvmNodeFactory);
     }
 }
+

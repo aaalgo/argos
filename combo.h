@@ -3,7 +3,7 @@
 
 namespace argos {
     namespace neural {
-        struct ConvNodeFactory: public Node::Factory {
+        struct ConvNodeFactory: public NodeFactory {
         public:
             virtual Node *create (Model *model, Config const &config) const {
                 string name = config.get<string>("name");
@@ -71,7 +71,7 @@ namespace argos {
             }
         };
 
-        class GlobalNodeFactory: public Node::Factory {
+        class GlobalNodeFactory: public NodeFactory {
         public:
             virtual Node *create (Model *model, Config const &config) const {
                 string name = config.get<string>("name");
@@ -92,6 +92,45 @@ namespace argos {
                     ArrayNode *neuron = model->createNode<ArrayNode>(cfg);
                     BOOST_VERIFY(neuron);
                     return neuron;
+                }
+            }
+            virtual bool isa (Node const *node) const {
+                return false ; //dynamic_cast<NODE_TYPE const*>(node) != 0;
+            }
+        };
+
+        class SvmNodeFactory: public NodeFactory {
+        public:
+            virtual Node *create (Model *model, Config const &config) const {
+                string name = config.get<string>("name");
+                {
+                    Config cfg;
+                    cfg.put("type", "simple");
+                    cfg.put("batch", config.get<string>("batch"));
+                    cfg.put("train", config.get<string>("train"));
+                    cfg.put("test", config.get<string>("test"));
+                    cfg.put("name", name + "_input");
+                    Node *input = model->createNode<Node>(cfg);
+                    BOOST_VERIFY(input);
+                }
+                {
+                    Config cfg;
+                    cfg.put("type", "linear");
+                    cfg.put("input", name + "_input");
+                    cfg.put("name", name + "_linear");
+                    cfg.put("channel", config.get<size_t>("channel"));
+                    Node *linear = model->createNode<Node>(cfg);
+                    BOOST_VERIFY(linear);
+                }
+                {
+                    Config cfg;
+                    cfg.put("type", config.get<string>("hinge"));
+                    cfg.put("input", name + "_linear");
+                    cfg.put("labels", name + "_input");
+                    cfg.put("name", name);
+                    Node *loss = model->createNode<ArrayNode>(cfg);
+                    BOOST_VERIFY(loss);
+                    return loss;
                 }
             }
             virtual bool isa (Node const *node) const {

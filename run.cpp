@@ -1,10 +1,12 @@
 #include <boost/timer/timer.hpp>
 #include <boost/program_options.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include "argos.h"
 
 using namespace std;
 using namespace boost;
 namespace po = boost::program_options; 
+namespace logging = boost::log;
 
 using namespace argos;
 
@@ -16,7 +18,7 @@ int main (int argc, char *argv[]) {
     unsigned report;
     unsigned snapshot;
     bool check = false;
-    bool verbose = false;
+    int loglevel = logging::trivial::info;
 
     po::options_description desc_visible("General options");
     desc_visible.add_options()
@@ -28,6 +30,7 @@ int main (int argc, char *argv[]) {
     ("report", po::value(&report)->default_value(100), "")
     ("snapshot", po::value(&snapshot)->default_value(0), "")
     ("verbose,v", "")
+    ("quiet,V", "")
     ("predict", "")
     ("check", "")
     ;
@@ -50,10 +53,16 @@ int main (int argc, char *argv[]) {
     }
 
     if (vm.count("check")) check = true;
-    if (vm.count("verbose")) verbose = true;
+
+    loglevel += vm.count("quiet");
+    loglevel -= vm.count("verbose");
+
+    logging::add_console_log(cerr);
+    logging::core::get()->set_filter(logging::trivial::severity >= loglevel);
+
 
     Config config;
-    load_config(config_path, &config);
+    LoadConfig(config_path, &config);
 
     Model model(config);
 
@@ -71,8 +80,7 @@ int main (int argc, char *argv[]) {
         model.init();
     }
 
-    Plan plan;
-    model.prepare(MODE_TRAIN, &plan);
+    Plan plan(model, MODE_TRAIN);
     unsigned loop = 0;
     for (;;) {
         plan.run();
@@ -89,11 +97,10 @@ int main (int argc, char *argv[]) {
                 model.save(model_path + "." + lexical_cast<string>(loop / snapshot));
             }
         }
-        if (loop >= maxloop) break;
+        if (maxloop > 0 && loop >= maxloop) break;
     }
     if (model_path.size()) {
         model.save(model_path);
     }
-
     return 0;
 }

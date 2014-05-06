@@ -9,9 +9,23 @@ namespace argos {
     using namespace std;
     using boost::lexical_cast;
 
-    static char const *METHOD_NAMES[] = {"NONE", "INIT", "PREDICT", "PREUPDATE", "UPDATE"};
+    void LoadConfig (string const &path, Config *config) {
+        boost::property_tree::read_xml(path, *config);
+    }
 
-    void Plan::freeze () {
+    static char const *METHOD_NAMES[] = {"NONE", "PREDICT", "PREUPDATE", "UPDATE"};
+
+    ostream &operator << (ostream &os, Plan::TaskId const &task) {
+        Node const *node = task.first;
+        Method method = task.second;
+        os << node->name() << ':' << node->type() << ":" << METHOD_NAMES[method];
+        return os;
+    }
+
+    Plan::Plan (Model const &model, Mode m): mode(m), frozen(false) {
+        for (auto node: model.m_nodes) {
+            const_cast<Node *>(node)->prepare(mode, this);
+        }
         for (unsigned i = 0; i < tasks.size(); ++i) {
             for (TaskId id: tasks[i].inputs) {
                 auto it = lookup.find(id);
@@ -19,23 +33,21 @@ namespace argos {
                 tasks[it->second].outputs.push_back(i);
             }
         }
+        frozen = true;
     }
 
-    void Plan::display () const {
+    void Plan::print (ostream &os) const {
         for (auto const &task: tasks) {
-            Node const *node = task.id.first;
-            Method method = task.id.second;
-            cout << node->name()  << ':' << node->type() << ' '  << METHOD_NAMES[method] << endl;
+            os << task.id << endl;
             for (auto const &id: task.inputs) {
-                Node const *node = id.first;
-                Method method = id.second;
-                cout << '\t' << node->name()  << ':' << node->type() << ' '  << METHOD_NAMES[method] << endl;
+                os << '\t' << id << endl;
             }
         }
     }
 
 
     void Plan::run (bool dry) const {
+        BOOST_VERIFY(frozen);
         unsigned n = tasks.size();
         unsigned done = 0;
         vector<unsigned> n_left(n);
@@ -53,12 +65,8 @@ namespace argos {
             unsigned idx = ready.top();
             ready.pop();
             Task const &task = tasks[idx];
-            if (dry) {
-                Node const *node = task.id.first;
-                Method method = task.id.second;
-                cerr << "RUN " << node->name() << ':' << node->type() << "->" << METHOD_NAMES[method] << endl;
-            }
-            else {
+            LOG(debug) << "RUN " << task.id;
+            if (!dry) {
                 task.callback();
             }
             for (unsigned o: task.outputs) {
@@ -73,15 +81,13 @@ namespace argos {
         BOOST_VERIFY(done == n);
     }
 
-
-
     Node::Node (Model *model, Config const &config)
         : m_config(config), m_model(model), m_name(config.get<string>("name", "")), m_type(config.get<string>("type"))
     {
         if (m_name.empty()) {
             m_name = "$"+lexical_cast<string>(this);
         }
-        //cerr << "creating " << name() << ':' << type() << endl;
+        LOG(debug) << "CREATE " << name() << ':' << type();
     }
 
     Node::~Node () {
@@ -90,7 +96,6 @@ namespace argos {
     void Node::prepare (Mode mode, Plan *plan) {
         switch (mode) {
             case MODE_TRAIN:
-            case MODE_VERIFY:
                 {
                     // add preupdate task
                     plan->add(this, TASK_PREUPDATE, [this, mode](){this->preupdate(mode);}).add(this, TASK_PREDICT);
@@ -136,16 +141,8 @@ namespace argos {
     void Node::update (Mode mode) {
     }
 
-    void Model::prepare (Mode mode, Plan *plan) {
-        plan->init(mode);
-        for (auto node: m_nodes) {
-            node->prepare(mode, plan);
-        }
-        plan->freeze();
-    }
-
     Model::Model (Config const &config): m_config(config), m_random(config.get<Random::result_type>("argos.default.seed", 2011)) {
-        register_factories();
+        registerAllFactories();
         for (Config::value_type const &node: config.get_child("argos")) {
             string const &name = node.first;
             if (name != "node") continue; // throw runtime_error("xml error");
@@ -153,13 +150,19 @@ namespace argos {
             createNode(conf);
         }
         m_input = nullptr;
+        m_loss = nullptr;
         for (Node *node: m_nodes) {
-            Input *input = dynamic_cast<Input *>(node);
+            role::Input *input = dynamic_cast<role::Input *>(node);
             if (input) {
-                if (m_input) throw runtime_error("can have only one input");
+                if (m_input) throw runtime_error("can have only one node of role input");
                 m_input = input;
             }
-            Stat *stat = dynamic_cast<Stat *>(node);
+            role::Loss *loss = dynamic_cast<role::Loss *>(node);
+            if (loss) {
+                if (m_loss) throw runtime_error("can have only one node of role loss");
+                m_loss = loss;
+            }
+            role::Stat *stat = dynamic_cast<role::Stat *>(node);
             if (stat) {
                 m_stats.push_back(stat);
             }
@@ -170,11 +173,11 @@ namespace argos {
         for (Node *node: m_nodes) {
             delete node;
         }
-        cleanup_factories();
+        cleanupFactories();
     }
 
     Node *Model::createNodeHelper (Config const &config) {
-        Node::Factory *fac = nullptr;
+        NodeFactory *fac = nullptr;
         {
             string type = config.get<string>("type");
             auto it = m_fac.find(type);
@@ -263,18 +266,9 @@ namespace argos {
     }
     */
 
-    /*
-    void Model::verify (bool dry) {
-        Plan plan;
-        prepare(MODE_VERIFY, &plan);
-        plan.run(dry);
-    }
-    */
-
     void Model::predict (ostream &os) {
-        Plan plan;
-        prepare(MODE_PREDICT, &plan);
-        m_input->reset(MODE_PREDICT);
+        Plan plan(*this, MODE_PREDICT);
+        m_input->rewind(MODE_PREDICT);
         for (auto *stat: m_stats) {
             stat->reset();
         }
@@ -293,11 +287,11 @@ namespace argos {
     }
 
     void Model::report (ostream &os) const {
-        for (Stat const *stat: m_stats) {
+        for (role::Stat const *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
             vector<float> cost;
-            stat->cost(&cost);
+            stat->means(&cost);
             vector<string> const &names = stat->names();
             os << node->name();
             BOOST_VERIFY(names.size() == cost.size());
@@ -306,10 +300,6 @@ namespace argos {
             }
             os << endl;
         }
-    }
-
-    void load_config (string const &path, Config *config) {
-        boost::property_tree::read_xml(path, *config);
     }
 }
 

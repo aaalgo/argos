@@ -9,7 +9,7 @@ OPENMP = -fopenmp
 CFLAGS += -g $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
 CXXFLAGS += -g $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
 LDFLAGS += -g $(STATIC) 
-LDLIBS += -lboost_program_options -lboost_timer -lboost_chrono -lboost_system -lopenblas-sandybridge-openmp
+LDLIBS += -lboost_program_options -lboost_log -lboost_log_setup -lboost_timer -lboost_chrono -lboost_thread -lboost_system -lopenblas-sandybridge-openmp
 
 HEADERS = argos.h array.h blas-wrapper.h neural.h combo.h io.h
 COMMON = blas-wrapper.o argos.o register.o
