@@ -34,7 +34,7 @@ int main (int argc, char *argv[]) {
     ("level", po::value(&loglevel)->default_value(logging::trivial::info), "")
     ("check", po::value(&check), "")
     ("check-epsilon", po::value(&epsilon)->default_value(0.0001), "")
-    ("check-sample", po::value(&sample)->default_value(100), "")
+    ("check-sample", po::value(&sample)->default_value(10), "")
     ("predict", "")
     ;
 

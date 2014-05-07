@@ -6,6 +6,7 @@
 #define timer timer_for_boost_progress_t
 #include <boost/progress.hpp>
 #undef timer
+#include <boost/timer/timer.hpp>
 #include "argos.h"
 
 namespace argos {

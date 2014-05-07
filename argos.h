@@ -559,9 +559,9 @@ namespace argos {
     }
 
     class LabelOutputNode: public Node { //, public AccOutput {
+        role::LabelInput const *m_label_input; 
     protected:
         vector<int> m_labels;           // the labels we predict
-        role::LabelInput const *m_label_input; 
     public:
         LabelOutputNode (Model *model, Config const &config): Node(model, config)
         {
@@ -569,6 +569,7 @@ namespace argos {
             BOOST_VERIFY(m_label_input);
         }
         vector<int> const &labels () const { return m_labels; }
+        vector<int> const &inputLabels () const { return m_label_input->labels(); }
     };
 }
 

@@ -45,10 +45,6 @@ namespace argos {
                 : ArrayNode(model, config),
                 m_dim(config.get<unsigned>("dim"))
             {
-                LOG(debug) << "dim: " << m_dim;
-                vector<size_t> size{batch(), m_dim};
-                resize(size);
-
                 string path;
                 if (mode() == MODE_PREDICT) {
                     path = config.get<string>("test");
@@ -77,6 +73,10 @@ namespace argos {
                     }
                 }
                 role::BatchInput::init(getConfig<unsigned>("batch", "argos.global.batch"), m_all_labels.size(), mode());
+                LOG(debug) << "dim: " << m_dim;
+                vector<size_t> size{batch(), m_dim};
+                resize(size);
+                setType(FLAT);
             }
 
             void predict () {

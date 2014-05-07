@@ -166,7 +166,7 @@ namespace argos {
             void predict () {
                 MaxScoreOutputNode::predict();
                 Array<>::value_type const *x = m_input->data().addr();
-                vector<int> const &truth = m_label_input->labels();
+                vector<int> const &truth = inputLabels();
                 m_labels.resize(truth.size());
                 for (size_t i = 0; i < truth.size(); ++i) {
                     Array<>::value_type mm = x[0];
@@ -195,7 +195,7 @@ namespace argos {
             void update () {
                 Array<>::value_type const *x = m_input->data().addr();
                 Array<>::value_type *dx = m_input->delta().addr();
-                vector<int> const &truth = m_label_input->labels();
+                vector<int> const &truth = inputLabels();
                 for (size_t i = 0; i < m_samples; ++i) {
                     int l = truth[i];
                     dx[l] +=  -1.0/x[l];
@@ -218,11 +218,10 @@ namespace argos {
             void predict () {
                 MaxScoreOutputNode::predict();
                 Array<>::value_type const *x = m_input->data().addr();
-                vector<int> const &truth = m_label_input->labels();
+                vector<int> const &truth = inputLabels();
                 m_labels.resize(truth.size());
                 for (size_t i = 0; i < truth.size(); ++i) {
                     int l = truth[i];
-                    x += m_stride;
                     unsigned bad = 0;            // sizeof left set
                     double t = x[l];
                     double total = 0;
@@ -235,13 +234,14 @@ namespace argos {
                     }
                     acc(0)(total);
                     acc(1)(bad ? 1.0 : 0.0);
+                    x += m_stride;
                 }
             }
 
             void update () {
                 Array<>::value_type const *x = m_input->data().addr();
                 Array<>::value_type *dx = m_input->delta().addr();
-                vector<int> const &truth = m_label_input->labels();
+                vector<int> const &truth = inputLabels();
                 for (size_t i = 0; i < m_samples; ++i) {
                     int l = truth[i];
                     unsigned left = 0;            // sizeof left set
@@ -365,7 +365,7 @@ namespace argos {
             ParamNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
                   m_meta(findInputAndAdd<Meta>("meta", "meta", "$meta")),
-                  m_init(config.get<double>("init", model->config().get<double>("argus.global.init", 0)))
+                  m_init(config.get<double>("init", model->config().get<double>("argos.global.init", 0)))
             {
                 vector<size_t> size;
                 size.push_back(config.get<size_t>("size"));
@@ -913,11 +913,13 @@ namespace argos {
                     LogPOutputNode *logp = dynamic_cast<LogPOutputNode *>(node);
                     if (logp == nullptr) break;
                     //cerr << "OPTIMIZE SOFTMAX + LOGP" << endl;
+                    vector<int> const &labels = logp->inputLabels();
+
                     for (size_t i = 0; i < samples; ++i) {
                         for (size_t j = 0; j < sz; ++j) {
                             in_delta[j] += out[j];
                         }
-                        int l = logp->labels()[i];
+                        int l = labels[i];
                         //BOOST_VERIFY(l < sz);
                         if (l < int(sz)) {
                             in_delta[l] -= 1.0;
