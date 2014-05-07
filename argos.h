@@ -296,7 +296,7 @@ namespace argos {
         /// Statistics.
         class Stat: public Role {
         protected:
-            typedef ba::accumulator_set<float, ba::stats<ba::tag::mean/*, tag::moment<2>*/>> Acc;
+            typedef ba::accumulator_set<double, ba::stats<ba::tag::mean/*, tag::moment<2>*/>> Acc;
             vector<string> m_names;
             vector<Acc> m_accs;
         public:
@@ -311,7 +311,7 @@ namespace argos {
                 return m_names;
             }
             /// Get the means of statistics.
-            void means (vector<float> *v) const {
+            void means (vector<double> *v) const {
                 v->clear();
                 for (auto const &acc: m_accs) {
                     v->push_back(ba::mean(acc));
@@ -331,7 +331,7 @@ namespace argos {
             Loss (vector<string> const &names): Stat(names) {
             }
             /// Return the loss value.
-            float loss () const {
+            double loss () const {
                 BOOST_VERIFY(m_accs.size());
                 return boost::accumulators::mean(m_accs[0]);
             }
@@ -340,6 +340,7 @@ namespace argos {
         /// Parameter interface.
         class Params: public Role {
         public:
+
         };
     }
 
@@ -418,13 +419,6 @@ namespace argos {
 
         Mode mode () const { return m_mode;}
 
-        void sync (Model const &from) {
-            BOOST_VERIFY(m_nodes.size() == from.m_nodes.size());
-            for (unsigned i = 0; i < m_nodes.size(); ++i) {
-                m_nodes[i]->sync(from.m_nodes[i]);
-            }
-        }
-
         Config const &config () const { return m_config; }
         Random &random () { return m_random; }
 
@@ -445,11 +439,22 @@ namespace argos {
         void init ();   // initialize
         void load (string const &path); // load
         void save (string const &path) const;
+        /// Synchronize from another model of the same architecture.
+        void sync (Model const &from) {
+            BOOST_VERIFY(m_nodes.size() == from.m_nodes.size());
+            for (unsigned i = 0; i < m_nodes.size(); ++i) {
+                m_nodes[i]->sync(from.m_nodes[i]);
+            }
+        }
 
         void predict (ostream &os = cerr);
         void train (ostream &os = cerr);
+        /// Report all statistics
+        /** If reset, then the statistics are reset to 0 after being reported.
+         */
         void report (ostream &os= cerr, bool reset = false);
-        void verify (bool dry = false);
+        /// Gradient verification, node must be of role Params.
+        void verify (string const &node);
 
         friend class Plan;
     };

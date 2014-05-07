@@ -284,7 +284,7 @@ namespace argos {
         for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
-            vector<float> cost;
+            vector<double> cost;
             stat->means(&cost);
             vector<string> const &names = stat->names();
             os << node->name();
