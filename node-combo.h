@@ -1,8 +1,10 @@
-#ifndef ARGOS_COMBO
-#define ARGOS_COMBO
+#ifndef ARGOS_NODE_COMBO
+#define ARGOS_NODE_COMBO
 
 namespace argos {
-    namespace neural {
+    namespace combo {
+        using namespace argos::core;
+
         struct ConvNodeFactory: public NodeFactory {
         public:
             virtual Node *create (Model *model, Config const &config) const {
@@ -105,7 +107,7 @@ namespace argos {
                 string name = config.get<string>("name");
                 {
                     Config cfg;
-                    cfg.put("type", "simple");
+                    cfg.put("type", "input-libsvm");
                     cfg.put("batch", config.get<string>("batch"));
                     cfg.put("dim", config.get<string>("dim"));
                     cfg.put("train", config.get<string>("train"));

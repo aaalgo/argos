@@ -1,5 +1,5 @@
-#ifndef ARGOS_NEURAL
-#define ARGOS_NEURAL
+#ifndef ARGOS_NODE_CORE
+#define ARGOS_NODE_CORE
 
 #include <cblas.h>
 #include <iostream>
@@ -9,7 +9,7 @@
 
 namespace argos {
 
-    namespace neural {
+    namespace core {
 
         class ArrayNode: public Node {
         public:
@@ -92,7 +92,7 @@ namespace argos {
                 m_input->delta().add_diff(m_input->data(), this->data());
             }
 
-            void cost (vector<float> *c) const {
+            void cost (vector<double> *c) const {
                 c->resize(1);
                 c->at(0) = data().l2sqr(m_input->data()) / 2;
             }
@@ -164,7 +164,7 @@ namespace argos {
                         acc(1)(1.0);
                     }
                     else {
-                        acc(1)(1.0 - float(1)/cmax);
+                        acc(1)(1.0 - 1.0/cmax);
                     }
                     x += m_stride;
                 }
@@ -184,12 +184,12 @@ namespace argos {
         };
 
         class HingeLossOutputNode: public MaxScoreOutputNode, public role::Loss {
-            float m_margin;
+            double m_margin;
         public:
             HingeLossOutputNode (Model *model, Config const &config) 
                 : MaxScoreOutputNode(model, config),
                   role::Loss({"loss", "error"}),
-                  m_margin(config.get<float>("margin", 0.25))
+                  m_margin(config.get<double>("margin", 0.25))
             {
             }
 
@@ -202,8 +202,8 @@ namespace argos {
                     int l = truth[i];
                     x += m_stride;
                     unsigned bad = 0;            // sizeof left set
-                    float t = x[l];
-                    float total = 0;
+                    double t = x[l];
+                    double total = 0;
                     for (unsigned c = 0; c < m_stride; ++c) {
                         if (c == unsigned(l)) continue;
                         if (x[c] >= t) ++bad;
@@ -223,7 +223,7 @@ namespace argos {
                 for (size_t i = 0; i < m_samples; ++i) {
                     int l = truth[i];
                     unsigned left = 0;            // sizeof left set
-                    float t = x[l];
+                    double t = x[l];
                     for (unsigned c = 0; c < m_stride; ++c) {
                         if (c == unsigned(l)) continue;
                         if (((x[c] + m_margin) >= t)) {
@@ -338,17 +338,17 @@ namespace argos {
 
         class ParamNode: public ArrayNode, public role::Params {
         public:
-            float m_mom;
-            float m_eta;
-            float m_lambda;
-            float m_init;
+            double m_mom;
+            double m_eta;
+            double m_lambda;
+            double m_init;
         public:
             ParamNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
-                  m_mom(config.get<float>("mom", model->config().get<float>("argus.global.mom", 0))),
-                  m_eta(config.get<float>("eta", model->config().get<float>("argus.global.eta", 0.0005))),
-                  m_lambda(config.get<float>("lambda", model->config().get<float>("argus.global.lambda", 0.5))),
-                  m_init(config.get<float>("init", model->config().get<float>("argus.global.init", 0)))
+                  m_mom(config.get<double>("mom", model->config().get<double>("argus.global.mom", 0))),
+                  m_eta(config.get<double>("eta", model->config().get<double>("argus.global.eta", 0.0005))),
+                  m_lambda(config.get<double>("lambda", model->config().get<double>("argus.global.lambda", 0.5))),
+                  m_init(config.get<double>("init", model->config().get<double>("argus.global.init", 0)))
             {
                 vector<size_t> size;
                 size.push_back(config.get<size_t>("size"));
@@ -930,7 +930,7 @@ namespace argos {
         class DropOutNode: public ArrayNode
         {
             ArrayNode *m_input;
-            float m_rate;
+            double m_rate;
             int m_freq;
             vector<Array<>::value_type> m_mask;
             size_t m_samples;
@@ -940,8 +940,8 @@ namespace argos {
             DropOutNode (Model *model, Config const &config)
                 : ArrayNode(model, config) {
                 m_input = findInputAndAdd<ArrayNode>("input", "input");
-                m_rate = config.get<float>("rate", 0.5);
-                m_freq = config.get<float>("freq", 1);
+                m_rate = config.get<double>("rate", 0.5);
+                m_freq = config.get<double>("freq", 1);
                 m_cnt = 0;
                 resize(*m_input);
                 set_type(m_input->type());
@@ -949,7 +949,7 @@ namespace argos {
                 m_sample_size = data().size() / m_samples;
                 m_mask.resize(m_sample_size, 0);
                 size_t nz = m_mask.size() * m_rate;
-                m_rate = float(nz) / m_mask.size();
+                m_rate = double(nz) / m_mask.size();
                 for (size_t i = 0; i < nz; ++i) {
                     m_mask[i] = 1.0;
                 }

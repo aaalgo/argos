@@ -21,7 +21,7 @@ namespace argos {
     using std::make_pair;
 
     // Multiple dimensional array.
-    template <typename T = float>    // align to cache line?
+    template <typename T = double>    // align to cache line?
     class Array {
     public:
         static constexpr size_t max_dim = 32;

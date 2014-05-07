@@ -1,14 +1,13 @@
-#ifndef ARGOS_IO
-#define ARGOS_IO
+#ifndef ARGOS_NODE_UTILS
+#define ARGOS_NODE_UTILS
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 
 namespace argos {
-
-    namespace neural {
-
+    namespace utils {
         using namespace std;
+        using namespace argos::core;
 
         class LabelTap: public Node {
             LabelOutputNode *m_input;
@@ -35,7 +34,7 @@ namespace argos {
             }
         };
 
-        class SimpleArrayInputNode: public ArrayNode, public role::LabelInput, public role::Input {
+        class LibSvmInputNode: public ArrayNode, public role::LabelInput, public role::Input {
             size_t m_batch;
             size_t m_dim;
             size_t m_off;
@@ -44,7 +43,7 @@ namespace argos {
             vector<unsigned> m_index;
             vector<int> m_batch_labels;
         public:
-            SimpleArrayInputNode (Model *model, Config const &config)
+            LibSvmInputNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
                   m_batch(config.get<size_t>("batch")),
                   m_dim(config.get<unsigned>("dim")),
@@ -126,6 +125,35 @@ namespace argos {
 
             virtual vector<int> const &labels () const {
                 return m_batch_labels;
+            }
+        };
+
+    /// The node evaluates the model periodically in training mode.
+        class Eval: public Node {
+            /// Clone the model for prediction.
+            unique_ptr<Model> m_modelClone;
+            unsigned m_period;
+            unsigned m_loop;
+        public:
+            Eval (Model *model, Config const &config)
+                : Node(model, config),
+                  m_modelClone(nullptr),
+                  m_period(config.get<unsigned>("period", 100)),
+                  m_loop(0)
+            {
+                findInputAndAdd<Node>("input", "input");
+                if ((mode() == MODE_TRAIN) && (m_period > 0)) {
+                    m_modelClone = unique_ptr<Model>(new Model(*model, MODE_PREDICT)); 
+                }
+            }
+            void predict () {
+                ++m_loop;
+                if ((mode() == MODE_TRAIN) && (m_period > 0) && (m_loop % m_period == 0)) {
+                    m_modelClone->sync(*model());
+                    m_modelClone->predict();
+                    cout << "EVAL ";
+                    m_modelClone->report(cout, true);
+                }
             }
         };
     }

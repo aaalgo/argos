@@ -6,7 +6,7 @@
         <init>0</init>
     </global>
     <node>
-        <type>simple</type>
+        <type>input-libsvm</type>
         <name>input</name>
         <dim>10752</dim>
         <batch>64</batch>
