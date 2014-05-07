@@ -1,7 +1,6 @@
 #ifndef ARGOS_NODE_CORE
 #define ARGOS_NODE_CORE
 
-#include <cblas.h>
 #include <iostream>
 #include "array.h"
 #include "argos.h"
@@ -57,7 +56,7 @@ namespace argos {
                 m_data.resize(size);
                 m_delta.resize(size);
             }
-            void set_type (int type) {
+            void setType (int type) {
                 m_type = type;
             }
         public:
@@ -85,10 +84,10 @@ namespace argos {
                 try {
                     try {
                         size.push_back(config.get<size_t>("height"));
-                        set_type(IMAGE);
+                        setType(IMAGE);
                     }
                     catch (...) {
-                        set_type(SOUND);
+                        setType(SOUND);
                     }
                     size.push_back(config.get<size_t>("width"));
                 }
@@ -159,9 +158,9 @@ namespace argos {
         class LogPOutputNode: public MaxScoreOutputNode, public role::Loss {
         public:
             LogPOutputNode (Model *model, Config const &config) 
-                : MaxScoreOutputNode(model, config),
-                  role::Loss({"loss", "error"})
+                : MaxScoreOutputNode(model, config)
             {
+                  role::Loss::init({"loss", "error"});
             }
 
             void predict () {
@@ -211,9 +210,9 @@ namespace argos {
         public:
             HingeLossOutputNode (Model *model, Config const &config) 
                 : MaxScoreOutputNode(model, config),
-                  role::Loss({"loss", "error"}),
                   m_margin(config.get<double>("margin", 0.25))
             {
+                  role::Loss::init({"loss", "error"});
             }
 
             void predict () {
@@ -344,7 +343,7 @@ namespace argos {
                 : ArrayNode(model, config) {
                 m_input = findInputAndAdd<ArrayNode>("input", "input");
                 resize(*m_input);
-                set_type(m_input->type());
+                setType(m_input->type());
             }
 
             void predict () {
@@ -448,7 +447,7 @@ namespace argos {
                 m_input = findInputAndAdd<ArrayNode>("input", "input");
                 m_input->data().size(&m_input_shape);
                 m_output_shape = m_input_shape;
-                set_type(m_input->type());
+                setType(m_input->type());
                 m_pad_w = config.get<size_t>("width");
                 m_pad_h = 0;
                 if (type() == IMAGE) {
@@ -552,7 +551,7 @@ namespace argos {
                     cerr << endl;
                     */
                     //cerr << "ROWS: " << m_rows << endl;
-                    set_type(m_input->type());
+                    setType(m_input->type());
                 }
                 else {
                     m_local = false;
@@ -706,7 +705,7 @@ namespace argos {
                 size.back() = m_output_channel;
                 resize(size);
                 m_state.resize(size);
-                set_type(m_input->type());
+                setType(m_input->type());
             }
 
             void predict () {
@@ -757,18 +756,18 @@ namespace argos {
                 m_samples = m_input_shape[0];
                 BOOST_VERIFY(m_input->type() == IMAGE || m_input->type() == SOUND);
 
-                set_type(m_input->type());
+                setType(m_input->type());
 
                 m_output_shape.push_back(m_input_shape[0]);
                 m_output_shape.push_back(1 + (m_input_shape[1] - m_bin) / m_step);
                 size_t channels = m_input_shape.back() * m_bin;
                 if (m_input->type() == IMAGE) {
                     m_output_shape.push_back(1 + (m_input_shape[2] - m_bin) / m_step);
-                    set_type(IMAGE);
+                    setType(IMAGE);
                     channels *= m_bin;
                 }
                 else {
-                    set_type(SOUND);
+                    setType(SOUND);
                 }
                 m_output_shape.push_back(channels);
                 resize(m_output_shape);
@@ -876,7 +875,7 @@ namespace argos {
                 : ArrayNode(model, config) {
                 m_input = findInputAndAdd<ArrayNode>("input", "input");
                 resize(*m_input);
-                set_type(m_input->type());
+                setType(m_input->type());
             }
 
             void predict () {
@@ -962,7 +961,7 @@ namespace argos {
                 m_freq = config.get<double>("freq", 1);
                 m_cnt = 0;
                 resize(*m_input);
-                set_type(m_input->type());
+                setType(m_input->type());
                 m_samples = data().size(size_t(0));
                 m_sample_size = data().size() / m_samples;
                 m_mask.resize(m_sample_size, 0);

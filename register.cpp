@@ -1,7 +1,9 @@
-#include <argos/argos.h>
-#include <argos/node-core.h>
-#include <argos/node-combo.h>
-#include <argos/node-utils.h>
+#include "argos.h"
+#include "node-core.h"
+#include "node-combo.h"
+#include "node-utils.h"
+#include "node-image.h"
+#include "node-cifar.h"
 
 namespace argos {
 
@@ -31,6 +33,9 @@ namespace argos {
         registerFactory("conv", new combo::ConvNodeFactory);
         registerFactory("global", new combo::GlobalNodeFactory);
         registerFactory("svm", new combo::SvmNodeFactory);
+
+        registerClass<cifar::CifarInputNode>("input-cifar");
+        registerClass<image::ImageInputNode>("input-image");
     }
 }
 

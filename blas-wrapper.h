@@ -1,8 +1,6 @@
 #ifndef ARGOS_BLAS
 #define ARGOS_BLAS
 
-#include <cblas.h>
-
 namespace argos {
     namespace blas {
         template <typename T>

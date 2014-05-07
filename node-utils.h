@@ -34,24 +34,19 @@ namespace argos {
             }
         };
 
-        class LibSvmInputNode: public ArrayNode, public role::LabelInput, public role::Input {
-            size_t m_batch;
+        class LibSvmInputNode: public ArrayNode, public role::LabelInput, public role::BatchInput {
             size_t m_dim;
-            size_t m_off;
-            vector<int> m_labels;
+            vector<int> m_all_labels;
             vector<vector<pair<unsigned, double>>> m_data;
             vector<unsigned> m_index;
-            vector<int> m_batch_labels;
+            vector<int> m_labels;
         public:
             LibSvmInputNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
-                  m_batch(config.get<size_t>("batch")),
-                  m_dim(config.get<unsigned>("dim")),
-                  m_off(0)
+                m_dim(config.get<unsigned>("dim"))
             {
                 LOG(debug) << "dim: " << m_dim;
-                LOG(debug) << "batch: " << m_batch;
-                vector<size_t> size{m_batch, m_dim};
+                vector<size_t> size{batch(), m_dim};
                 resize(size);
 
                 string path;
@@ -62,7 +57,7 @@ namespace argos {
                     path = config.get<string>("train");
                 }
 
-                cerr << "Loading " << path << "..." << endl;
+                LOG(info) << "loading " << path;
                 ifstream is(path.c_str());
                 string line;
                 while (getline(is, line)) {
@@ -72,7 +67,7 @@ namespace argos {
                     double v;
                     ss >> l;
                     if (!ss) continue;
-                    m_labels.push_back(l);
+                    m_all_labels.push_back(l);
                     m_data.push_back(vector<pair<unsigned, double>>());
                     auto &back = m_data.back();
                     while (ss >> d >> dummy >> v) {
@@ -81,38 +76,15 @@ namespace argos {
                         BOOST_VERIFY(d <= m_dim);
                     }
                 }
-                m_index.resize(m_labels.size());
-                for (unsigned i = 0; i < m_index.size(); ++i) m_index[i] = i;
-                if (mode() != MODE_PREDICT) {
-                    random_shuffle(m_index.begin(), m_index.end());
-                }
-            }
-
-            void rewind () {
-                m_off = 0;
+                role::BatchInput::init(getConfig<unsigned>("batch", "argos.global.batch"), m_all_labels.size(), mode());
             }
 
             void predict () {
-                m_batch_labels.resize(m_batch);
-                if (m_off + m_batch > m_index.size()) {
-                    if (mode() == MODE_TRAIN) {
-                        random_shuffle(m_index.begin(), m_index.end());
-                        m_off = 0;
-                        BOOST_VERIFY(m_off + m_batch <= m_index.size());
-                    }
-                }
-                if (m_off >= m_index.size()) {
-                    throw StopIterationException();
-                }
                 data().fill(0.0);
+                m_labels.clear(); //resize(m_batch);
                 Array<>::value_type *x = data().addr();
-                for (unsigned b = 0; b < m_batch; ++b) {
-                    if (m_off >= m_index.size()) {
-                        m_batch_labels.resize(b);
-                        break;
-                    }
-                    size_t i = m_index[m_off++];
-                    m_batch_labels[b] = m_labels[i];
+                role::BatchInput::next([this, &x](unsigned i) {
+                    m_labels.push_back(m_all_labels[i]);
                     for (auto p: m_data[i]) {
                         if (p.first >= m_dim) {
                             LOG(error) << "dim exceeds range: " << p.first;
@@ -120,11 +92,11 @@ namespace argos {
                         x[p.first] = p.second;
                     }
                     x += m_dim;
-                }
+                });
             }
 
             virtual vector<int> const &labels () const {
-                return m_batch_labels;
+                return m_labels;
             }
         };
 

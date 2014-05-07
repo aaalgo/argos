@@ -1,5 +1,7 @@
 #include <boost/assert.hpp>
+#include "cblas.h"
 #include "blas-wrapper.h"
+
 
 namespace argos {
     namespace blas {

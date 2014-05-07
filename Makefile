@@ -9,9 +9,9 @@ OPENMP = -fopenmp
 CFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
 CXXFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
 LDFLAGS += $(STATIC)
-LDLIBS += -lboost_program_options -lboost_log -lboost_log_setup -lboost_timer -lboost_chrono -lboost_thread -lboost_system -lopenblas-sandybridge-openmp -ldl
+LDLIBS += -lopencv_imgproc -lopencv_core -lboost_program_options -lboost_log -lboost_timer -lboost_chrono -lboost_thread -lboost_system -ljpeg -lopenblas-sandybridge-openmp -ldl -lz
 
-HEADERS = argos.h array.h blas-wrapper.h neural.h combo.h io.h eval.h
+HEADERS = argos.h array.h blas-wrapper.h node-core.h node-utils.h node-combo.h
 COMMON = blas-wrapper.o argos.o library.o register.o library.o
 PROGS = #argos #cifar train predict
 SHARED = argos-basic.so

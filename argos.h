@@ -124,7 +124,7 @@ namespace argos {
          * plan.  All reference to tasks to be added in future is resolved after
          * all tasks have been added.
          */
-        Deps add (Node const *node, Method method, function<void()> const &callback) {
+        Deps add (Node const *node, Method method, function<void()> callback) {
             BOOST_VERIFY(!frozen);
             unsigned idx = tasks.size();
             Task task;
@@ -272,6 +272,10 @@ namespace argos {
      *
      * Every interface in this category have to inherit from the base class
      * Role.
+     *
+     * Virtual inheritance is used to solve the diamond problem, all classes
+     * under the role namespace are not allowed to have a constructor.  Rather,
+     * a "init" method is used when needed.
      */
     namespace role {
 
@@ -281,13 +285,53 @@ namespace argos {
         };
 
         // Sample input.
-        class Input: public Role {
+        class Input: public virtual Role {
         public:
             virtual void rewind () = 0;
         };
 
+        class BatchInput: public virtual Input {
+            unsigned m_mode;
+            unsigned m_batch;
+            unsigned m_off;
+            vector<unsigned> m_index;
+        public:
+            void init (unsigned batch, unsigned sz, Mode mode) {
+                m_mode = mode;
+                m_batch = batch;
+                m_off = 0;
+                m_index.resize(sz);
+                for (unsigned i = 0; i < sz; ++i) m_index[i] = i;
+                if (m_mode  == MODE_TRAIN) {
+                    m_off = sz; // so that index will be shuffled when next is called
+                }
+            }
+            unsigned batch () const {
+                return m_batch;
+            }
+            void rewind () {
+                m_off = 0;
+            }
+            void next (function<void(unsigned)> callback) {
+                if (m_off + m_batch > m_index.size()) {
+                    if (m_mode == MODE_TRAIN) {
+                        rewind();
+                        random_shuffle(m_index.begin(), m_index.end());
+                        BOOST_VERIFY(m_off + m_batch <= m_index.size());
+                    }
+                }
+                if (m_off >= m_index.size()) {
+                    throw StopIterationException();
+                }
+                for (unsigned b = 0; b < m_batch; ++b) {
+                    if (m_off >= m_index.size()) break;
+                    callback(m_index[m_off++]);
+                }
+            }
+        };
+
         /// Label input.
-        class LabelInput: public Role {
+        class LabelInput: public virtual Role {
         public:
             // for training, the return size should always be the same;
             // for prediction, the number of actual available example is returned.
@@ -295,13 +339,15 @@ namespace argos {
         };
 
         /// Statistics.
-        class Stat: public Role {
+        class Stat: public virtual Role {
         protected:
             typedef ba::accumulator_set<double, ba::stats<ba::tag::mean/*, tag::moment<2>*/>> Acc;
             vector<string> m_names;
             vector<Acc> m_accs;
         public:
-            Stat (vector<string> const &names): m_names(names), m_accs(names.size()) {
+            void init (vector<string> const &names) {
+                m_names = names;
+                m_accs.resize(names.size());
             }
             void reset () {
                 for (auto &acc: m_accs) {
@@ -327,10 +373,8 @@ namespace argos {
         /** A model can have multiple stat nodes, but can only have one loss
          * node.  The mean of the first stat value is automatically used as loss.
          */
-        class Loss: public Stat {
+        class Loss: public virtual Stat {
         public:
-            Loss (vector<string> const &names): Stat(names) {
-            }
             /// Return the loss value.
             double loss () const {
                 BOOST_VERIFY(m_accs.size());
@@ -349,7 +393,7 @@ namespace argos {
          *      * compute gradient, check with delta
          *      * rollback to old value (un-perturb)
          */
-        class Params: public Role {
+        class Params: public virtual Role {
         public:
             /// size of parameters.
             virtual size_t size () const = 0;
