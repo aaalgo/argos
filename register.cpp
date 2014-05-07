@@ -7,6 +7,7 @@ namespace argos {
 
     void Library::registerInternalFactories () {
         registerClass<Node>("generic");
+        registerClass<core::Meta>("meta");
         registerClass<core::FunctionNode<core::function::id>>("id");
         registerClass<core::FunctionNode<core::function::relu>>("relu");
         registerClass<core::FunctionNode<core::function::softrelu>>("softrelu");

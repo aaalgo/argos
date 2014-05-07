@@ -11,6 +11,29 @@ namespace argos {
 
     namespace core {
 
+        class Meta: public Node {
+            double m_mom;
+            double m_eta;
+            double m_lambda;
+        public:
+            Meta (Model *model, Config const &config)
+                : Node(model, config),
+                  m_mom(getConfig<double>("mom", "argos.global.mom", 0)),
+                  m_eta(getConfig<double>("eta", "argos.global.eta", 0.0005)),
+                  m_lambda(getConfig<double>("lambda", "argos.global.lambda", 0.5))
+            {
+            }
+            double mom () const {
+                return m_mom;
+            }
+            double eta () const {
+                return m_eta;
+            }
+            double lambda () const {
+                return m_lambda;
+            }
+        };
+
         class ArrayNode: public Node {
         public:
             enum {
@@ -337,17 +360,12 @@ namespace argos {
         };
 
         class ParamNode: public ArrayNode, public role::Params {
-        public:
-            double m_mom;
-            double m_eta;
-            double m_lambda;
+            Meta  *m_meta;
             double m_init;
         public:
             ParamNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
-                  m_mom(config.get<double>("mom", model->config().get<double>("argus.global.mom", 0))),
-                  m_eta(config.get<double>("eta", model->config().get<double>("argus.global.eta", 0.0005))),
-                  m_lambda(config.get<double>("lambda", model->config().get<double>("argus.global.lambda", 0.5))),
+                  m_meta(findInputAndAdd<Meta>("meta", "meta", "$meta")),
                   m_init(config.get<double>("init", model->config().get<double>("argus.global.init", 0)))
             {
                 vector<size_t> size;
@@ -387,20 +405,20 @@ namespace argos {
 
             void predict () {
                 if (mode() == MODE_TRAIN) {
-                    data().add_scaled(-m_eta, delta());
+                    data().add_scaled(-m_meta->eta(), delta());
                 }
             }
 
             void preupdate () {
                 if (mode() == MODE_TRAIN) {
-                    if (m_mom == 0) {   // m_mom has to be 0 for verify mode
+                    if (m_meta->mom() == 0) {   // m_mom has to be 0 for verify mode
                         delta().fill(0);
                     }
                     else {
-                        delta().scale(m_mom);
+                        delta().scale(m_meta->mom());
                     }
-                    if (m_lambda) {
-                        delta().add_scaled(m_lambda, data());
+                    if (m_meta->lambda()) {
+                        delta().add_scaled(m_meta->lambda(), data());
                     }
                 }
             }

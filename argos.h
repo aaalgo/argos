@@ -195,7 +195,7 @@ namespace argos {
     protected:
         /// Retrieve name from config, and add node with that name as input.
         template <typename TYPE>
-        TYPE *findInputAndAdd (string const &configAttr, string const &tag);
+        TYPE *findInputAndAdd (string const &configAttr, string const &tag, string const &defaul = "");
 
         void addInput (Node *node, string const &tag) {
             m_inputs.push_back({tag, node});
@@ -218,6 +218,8 @@ namespace argos {
          */
         template <typename TYPE>
         TYPE getConfig (string const &path, string const &fallback) const;
+        template <typename TYPE>
+        TYPE getConfig (string const &path, string const &fallback, TYPE defaul) const;
 
         Model *model () { return m_model; }
         Mode mode () const;
@@ -474,8 +476,14 @@ namespace argos {
     };
 
     template <typename TYPE>
-    TYPE *Node::findInputAndAdd (string const &configAttr, string const &tag = "") {
-        string node_name = m_config.get<string>(configAttr);
+    TYPE *Node::findInputAndAdd (string const &configAttr, string const &tag, string const &defaul) {
+        string node_name;
+        if (defaul.empty()) {
+            node_name = m_config.get<string>(configAttr);
+        }
+        else {
+            node_name = m_config.get<string>(configAttr, defaul);
+        }
         TYPE *node = m_model->findNode<TYPE>(node_name);
         if (node == nullptr) throw 0;
         addInput(node, tag);
@@ -489,6 +497,16 @@ namespace argos {
         }
         catch (...) {
             return m_model->config().get<TYPE>(fallback);
+        }
+    }
+
+    template <typename TYPE>
+    TYPE Node::getConfig (string const &path, string const &fallback, TYPE defaul) const {
+        try {
+            return m_config.get<TYPE>(path);
+        }
+        catch (...) {
+            return m_model->config().get<TYPE>(fallback, defaul);
         }
     }
 

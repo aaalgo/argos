@@ -156,6 +156,12 @@ namespace argos {
     Library library;
 
     Model::Model (Config const &config, Mode mode): m_config(config), m_mode(mode), m_random(config.get<Random::result_type>("argos.global.seed", 2011)) {
+        { // create meta node
+            Config cfg;
+            cfg.put("type", "meta");
+            cfg.put("name", "$meta");
+            createNode(cfg);
+        }
         for (Config::value_type const &node: config.get_child("argos")) {
             string const &name = node.first;
             if (name != "node") continue; // throw runtime_error("xml error");
