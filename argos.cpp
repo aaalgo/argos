@@ -3,11 +3,15 @@
 #include <stack>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/xml_parser.hpp>
+#define timer timer_for_boost_progress_t
+#include <boost/progress.hpp>
+#undef timer
 #include "argos.h"
 
 namespace argos {
 
     using namespace std;
+    using namespace boost;
     using boost::lexical_cast;
 
     void LoadConfig (string const &path, Config *config) {
@@ -160,7 +164,9 @@ namespace argos {
         }
         m_input = nullptr;
         m_loss = nullptr;
+        LOG(info) << "model constructed";
         for (Node *node: m_nodes) {
+            LOG(info) << "check node " << node->name() << ':' << node->type();
             role::Input *input = dynamic_cast<role::Input *>(node);
             if (input) {
                 if (m_input) throw runtime_error("can have only one node of role input");
@@ -294,6 +300,75 @@ namespace argos {
             }
             os << endl;
             if (reset) stat->reset();
+        }
+    }
+
+    void Model::verify (string const &node, double epsilon, size_t sample) {
+        role::Params *params = findNode<role::Params>(node);
+        if (!params) throw runtime_error("node not found or not of role params: " + node);
+        if (mode() != MODE_TRAIN) throw runtime_error("verify most be run with MODE_TRAIN");
+
+        Plan plan(*this);
+        stringstream ss;
+        // save all nodes to stream to keep status
+        for (Node const *node: m_nodes) {
+            node->save(ss);
+        }
+
+        size_t n = params->size();
+        vector<size_t> index(n);  // index of parameters to verify
+        {   // initialize indices, sample if needed
+            for (unsigned i = 0; i < n; ++i) index[i] = i;
+            if (sample > 0 && sample < n) {
+                random_shuffle(index.begin(), index.end());
+                index.resize(sample);
+            }
+        }
+        vector<double> grad(index.size());
+        vector<double> grad_check(index.size());
+        // pass one to compute
+        m_loss->reset();
+        m_input->rewind();
+        plan.run();
+        double loss = m_loss->loss();
+#if 1
+        {
+            ss.seekg(0);
+            for (Node *node: m_nodes) {
+                node->load(ss);
+            }
+            m_loss->reset();
+            m_input->rewind();
+            plan.run();
+            cout << "DOUBLE CHECK SERIALIZATION: " << loss << "==" << m_loss->loss() << endl;
+        }
+#endif
+        // get graident
+        for (unsigned i = 0; i < index.size(); ++i) {
+            grad[i] = params->gradient(index[i]);
+        }
+        cout << "COMPUTING GRADIENTS BY PERTURBATION, BE PATIENT..." << endl;
+        progress_display progress(index.size());
+        for (size_t i = 0; i < index.size(); ++i) {
+            // reset status
+            ss.seekg(0);
+            for (Node *node: m_nodes) {
+                node->load(ss);
+            }
+            m_input->rewind();
+            m_loss->reset();
+            params->perturb(index[i], epsilon);
+            plan.run();
+            double perturb_loss = m_loss->loss();
+            //cerr << perturb_loss << endl;
+            grad_check[i] = (perturb_loss - loss) / epsilon;
+            ++progress;
+        }
+        cout << "CHECKED " << index.size() << " PARAMETERS." << endl;
+        cout << "INDEX\tTRUE VALUE\tTRAINED VALUE\tABS ERROR\tREL ERROR" << endl;
+        for (size_t i = 0; i < index.size(); ++i) {
+            double err = grad_check[i] - grad[i];
+            cout << index[i] << '\t' << grad_check[i] << '\t' << grad[i] << '\t' << std::abs(err) << '\t' << err/grad[i] << endl;
         }
     }
 }

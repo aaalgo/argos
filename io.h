@@ -90,12 +90,7 @@ namespace argos {
             }
 
             void rewind () {
-                if (mode() == MODE_PREDICT) {
-                    m_off = 0;
-                }
-                else {
-                    BOOST_VERIFY(0);    // for now don't support reset for training
-                }
+                m_off = 0;
             }
 
             void predict () {

@@ -14,7 +14,6 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/log/trivial.hpp>
-
 #define LOG(x) BOOST_LOG_TRIVIAL(x)
 
 namespace argos {
@@ -333,14 +332,29 @@ namespace argos {
             /// Return the loss value.
             double loss () const {
                 BOOST_VERIFY(m_accs.size());
-                return boost::accumulators::mean(m_accs[0]);
+                return ba::mean(m_accs[0]);
             }
         };
 
-        /// Parameter interface.
+        /// Parameter interface for gradient checking.
+        /**
+         * Gradient checking algroithm:
+         *  1. do a normal back-propagation pass to obtain the normal deltas.
+         *  2. For each parameter
+         *      * do a forward pass, record loss
+         *      * perturb the parameter
+         *      * do another forward pass, record loss
+         *      * compute gradient, check with delta
+         *      * rollback to old value (un-perturb)
+         */
         class Params: public Role {
         public:
-
+            /// size of parameters.
+            virtual size_t size () const = 0;
+            /// perturbe parameter with epsilon.
+            /** returns old value to be used for rollback.*/
+            virtual void perturb (size_t index, double epsilon) = 0;
+            virtual double gradient (size_t index) const = 0;
         };
     }
 
@@ -454,7 +468,7 @@ namespace argos {
          */
         void report (ostream &os= cerr, bool reset = false);
         /// Gradient verification, node must be of role Params.
-        void verify (string const &node);
+        void verify (string const &node, double epsilon, size_t sample = 0);
 
         friend class Plan;
     };

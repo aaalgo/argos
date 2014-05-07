@@ -17,7 +17,9 @@ int main (int argc, char *argv[]) {
     unsigned maxloop;
     unsigned report;
     unsigned snapshot;
-    bool check = false;
+    string check;
+    double epsilon;
+    unsigned sample;
     int loglevel; // = logging::trivial::info;
 
     po::options_description desc_visible("General options");
@@ -30,8 +32,10 @@ int main (int argc, char *argv[]) {
     ("report", po::value(&report)->default_value(100), "")
     ("snapshot", po::value(&snapshot)->default_value(0), "")
     ("level", po::value(&loglevel)->default_value(logging::trivial::info), "")
+    ("check", po::value(&check), "")
+    ("check-epsilon", po::value(&epsilon)->default_value(0.0001), "")
+    ("check-sample", po::value(&sample)->default_value(100), "")
     ("predict", "")
-    ("check", "")
     ;
 
     po::options_description desc("Allowed options");
@@ -51,8 +55,6 @@ int main (int argc, char *argv[]) {
         return 0;
     }
 
-    if (vm.count("check")) check = true;
-
     logging::add_console_log(cerr);
     logging::core::get()->set_filter(logging::trivial::severity >= loglevel);
 
@@ -71,6 +73,16 @@ int main (int argc, char *argv[]) {
         model.load(model_path);
         model.predict();
         return 0;
+    }
+    else if (vm.count("check")) {
+        Model model(config, MODE_TRAIN);
+        if (init_path.size()) {
+            model.load(init_path);
+        }
+        else {
+            model.init();
+        }
+        model.verify(check, epsilon, sample);
     }
     else {
         Model model(config, MODE_TRAIN);

@@ -336,7 +336,7 @@ namespace argos {
             }
         };
 
-        class ParamNode: public ArrayNode {
+        class ParamNode: public ArrayNode, public role::Params {
         public:
             float m_mom;
             float m_eta;
@@ -403,6 +403,20 @@ namespace argos {
                         delta().add_scaled(m_lambda, data());
                     }
                 }
+            }
+
+            size_t size () const {
+                return data().size();
+            }
+
+            void perturb (size_t index, double epsilon) {
+                auto addr = data().addr();
+                addr[index] += epsilon;
+            }
+
+            double gradient (size_t index) const {
+                auto addr = delta().addr();
+                return addr[index];
             }
         };
 
