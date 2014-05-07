@@ -1,3 +1,4 @@
+#include <sstream>
 #include <fstream>
 #include <stack>
 #include <boost/lexical_cast.hpp>
@@ -22,9 +23,9 @@ namespace argos {
         return os;
     }
 
-    Plan::Plan (Model const &model, Mode m): mode(m), frozen(false) {
+    Plan::Plan (Model const &model): frozen(false) {
         for (auto node: model.m_nodes) {
-            const_cast<Node *>(node)->prepare(mode, this);
+            const_cast<Node *>(node)->prepare(this);
         }
         for (unsigned i = 0; i < tasks.size(); ++i) {
             for (TaskId id: tasks[i].inputs) {
@@ -93,14 +94,14 @@ namespace argos {
     Node::~Node () {
     }
 
-    void Node::prepare (Mode mode, Plan *plan) {
-        switch (mode) {
+    void Node::prepare (Plan *plan) {
+        switch (mode()) {
             case MODE_TRAIN:
                 {
                     // add preupdate task
-                    plan->add(this, TASK_PREUPDATE, [this, mode](){this->preupdate(mode);}).add(this, TASK_PREDICT);
+                    plan->add(this, TASK_PREUPDATE, std::bind(&Node::preupdate, dynamic_cast<Node *>(this))).add(this, TASK_PREDICT);
                     // add update task
-                    auto deps = plan->add(this, TASK_UPDATE, [this, mode](){this->update(mode);});
+                    auto deps = plan->add(this, TASK_UPDATE, std::bind(&Node::update, dynamic_cast<Node *>(this)));
                     deps.add(this, TASK_PREUPDATE);
                     for (auto &pin: m_outputs) {
                         deps.add(pin.node, TASK_UPDATE);
@@ -112,7 +113,7 @@ namespace argos {
                 // no break, need to add PREDICT tasks
             case MODE_PREDICT:
                 {
-                    auto deps = plan->add(this, TASK_PREDICT, std::bind(&Node::predict, this, mode));//[this, mode](){this->predict(mode);});
+                    auto deps = plan->add(this, TASK_PREDICT, std::bind(&Node::predict, this));
                     for (auto pin: m_inputs) {
                         deps.add(pin.node, TASK_PREDICT);
                     }
@@ -132,17 +133,25 @@ namespace argos {
     void Node::init () {
     }
 
-    void Node::predict (Mode mode) {
+    void Node::sync (Node const *from) {
+        stringstream ss;
+        from->save(ss);
+        ss.seekg(0);
+        load(ss);
     }
 
-    void Node::preupdate (Mode mode) {
+    void Node::predict () {
     }
 
-    void Node::update (Mode mode) {
+    void Node::preupdate () {
     }
 
-    Model::Model (Config const &config): m_config(config), m_random(config.get<Random::result_type>("argos.default.seed", 2011)) {
-        registerAllFactories();
+    void Node::update () {
+    }
+
+    Library library;
+
+    Model::Model (Config const &config, Mode mode): m_config(config), m_mode(mode), m_random(config.get<Random::result_type>("argos.global.seed", 2011)) {
         for (Config::value_type const &node: config.get_child("argos")) {
             string const &name = node.first;
             if (name != "node") continue; // throw runtime_error("xml error");
@@ -173,19 +182,10 @@ namespace argos {
         for (Node *node: m_nodes) {
             delete node;
         }
-        cleanupFactories();
     }
 
     Node *Model::createNodeHelper (Config const &config) {
-        NodeFactory *fac = nullptr;
-        {
-            string type = config.get<string>("type");
-            auto it = m_fac.find(type);
-            if (it == m_fac.end()) {
-                throw runtime_error("node type '" + type + "' not found");
-            }
-            fac = it->second;
-        }
+        NodeFactory *fac = library.find(config.get<string>("type"));
         Node *node = fac->create(this, config);
         string name = node->name();
         if (!name.empty()) {
@@ -241,37 +241,35 @@ namespace argos {
         }
     }
 
-    /*
-    void Model::train () {
-        Plan plan;
-        schedule(MODE_TRAIN, &plan);
-        for (int i = 0; i < loops; ++i) {
-            load_data();
-            run(plan);
-        }
-        Plan plan;
-        model.prepare(MODE_TRAIN, &plan);
+    void Model::train (ostream &os) {
+        Plan plan(*this);
+        unsigned report = config().get<unsigned>("argos.global.report", 0);
+        unsigned snapshot = config().get<unsigned>("argos.global.snapshot", 0);
+        unsigned maxloop = config().get<unsigned>("argos.global.maxloop", 0);
+        string model_path = config().get<string>("argos.global.model", "");
         unsigned loop = 0;
         for (;;) {
             plan.run();
             ++loop;
             if (report && (loop % report == 0)) {
-                cerr << loop << ' ';
-                model.report(cerr);
+                os << loop << ' ' << endl;
+                os << "\ttrain ";
+                this->report(os, true);
+                // run evaluation
+                //clone.sync(*this);
             }
             if (snapshot && (loop % snapshot == 0)) {
-                model.save(model_path + "." + lexical_cast<string>(loop / snapshot));
+                if (model_path.size()) {
+                    save(model_path + "." + lexical_cast<string>(loop / snapshot));
+                }
             }
+            if (maxloop > 0 && loop >= maxloop) break;
         }
     }
-    */
 
     void Model::predict (ostream &os) {
-        Plan plan(*this, MODE_PREDICT);
-        m_input->rewind(MODE_PREDICT);
-        for (auto *stat: m_stats) {
-            stat->reset();
-        }
+        Plan plan(*this);
+        m_input->rewind();
         for (;;) {
             try {
                 plan.run();
@@ -280,14 +278,10 @@ namespace argos {
                 break;
             }
         }
-        report(os);
-        for (auto *stat: m_stats) {
-            stat->reset();
-        }
     }
 
-    void Model::report (ostream &os) const {
-        for (role::Stat const *stat: m_stats) {
+    void Model::report (ostream &os, bool reset) {
+        for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
             vector<float> cost;
@@ -299,6 +293,7 @@ namespace argos {
                 os << ' ' << names[i] << ':' << cost[i];
             }
             os << endl;
+            if (reset) stat->reset();
         }
     }
 }

@@ -107,6 +107,7 @@ namespace argos {
                     Config cfg;
                     cfg.put("type", "simple");
                     cfg.put("batch", config.get<string>("batch"));
+                    cfg.put("dim", config.get<string>("dim"));
                     cfg.put("train", config.get<string>("train"));
                     cfg.put("test", config.get<string>("test"));
                     cfg.put("name", name + "_input");
@@ -124,11 +125,11 @@ namespace argos {
                 }
                 {
                     Config cfg;
-                    cfg.put("type", config.get<string>("hinge"));
+                    cfg.put("type", "hinge");
                     cfg.put("input", name + "_linear");
                     cfg.put("labels", name + "_input");
                     cfg.put("name", name);
-                    Node *loss = model->createNode<ArrayNode>(cfg);
+                    Node *loss = model->createNode<Node>(cfg);
                     BOOST_VERIFY(loss);
                     return loss;
                 }

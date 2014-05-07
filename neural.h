@@ -45,7 +45,7 @@ namespace argos {
             Array<> &delta () { return m_delta; }
             Array<> const &data () const { return m_data; }
             Array<> const &delta () const { return m_delta; }
-            void preupdate (Mode mode)  {
+            void preupdate ()  {
                 delta().fill(0);
             }
             int type () const {
@@ -116,7 +116,7 @@ namespace argos {
                 m_stride = m_input->data().size() / m_samples;
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 m_labels.resize(m_samples);
                 Array<>::value_type const *x = m_input->data().addr();
                 for (size_t i = 0; i < m_samples; ++i) {
@@ -141,10 +141,8 @@ namespace argos {
             {
             }
 
-            void predict (Mode mode) {
-                MaxScoreOutputNode::predict(mode);
-                float logp = 0;
-                float nmiss = 0;
+            void predict () {
+                MaxScoreOutputNode::predict();
                 Array<>::value_type const *x = m_input->data().addr();
                 vector<int> const &truth = m_label_input->labels();
                 m_labels.resize(truth.size());
@@ -161,20 +159,18 @@ namespace argos {
                         }
                     }
                     int l = truth[i];
-                    logp += log(x[l]);
+                    acc(0)(-log(x[l]));
                     if (x[l] < mm) {
-                        nmiss += 1.0;
+                        acc(1)(1.0);
                     }
                     else {
-                        nmiss += 1.0 - float(1)/cmax;
+                        acc(1)(1.0 - float(1)/cmax);
                     }
                     x += m_stride;
                 }
-                acc(0)(-logp);
-                acc(1)(nmiss);
             }
 
-            void update (Mode mode) {
+            void update () {
                 Array<>::value_type const *x = m_input->data().addr();
                 Array<>::value_type *dx = m_input->delta().addr();
                 vector<int> const &truth = m_label_input->labels();
@@ -197,10 +193,8 @@ namespace argos {
             {
             }
 
-            void predict (Mode mode) {
-                MaxScoreOutputNode::predict(mode);
-                float total = 0;
-                float nmiss = 0;
+            void predict () {
+                MaxScoreOutputNode::predict();
                 Array<>::value_type const *x = m_input->data().addr();
                 vector<int> const &truth = m_label_input->labels();
                 m_labels.resize(truth.size());
@@ -209,6 +203,7 @@ namespace argos {
                     x += m_stride;
                     unsigned bad = 0;            // sizeof left set
                     float t = x[l];
+                    float total = 0;
                     for (unsigned c = 0; c < m_stride; ++c) {
                         if (c == unsigned(l)) continue;
                         if (x[c] >= t) ++bad;
@@ -216,13 +211,12 @@ namespace argos {
                             total += x[c] + m_margin - t;
                         }
                     }
-                    if (bad) nmiss += 1.0;
+                    acc(0)(total);
+                    acc(1)(bad ? 1.0 : 0.0);
                 }
-                acc(0)(total);
-                acc(1)(nmiss);
             }
 
-            void update (Mode mode) {
+            void update () {
                 Array<>::value_type const *x = m_input->data().addr();
                 Array<>::value_type *dx = m_input->delta().addr();
                 vector<int> const &truth = m_label_input->labels();
@@ -330,11 +324,11 @@ namespace argos {
                 set_type(m_input->type());
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 data().apply(m_input->data(), [](Array<>::value_type &y, Array<>::value_type x){y = F::forward(x);});
             }
 
-            void update (Mode mode) {
+            void update () {
                 m_input->delta().apply(m_input->data(), data(), delta(),
                         [](Array<>::value_type &dx, Array<>::value_type x, Array<>::value_type y, Array<>::value_type dy) {
                             dx += F::backward(x, y) * dy;
@@ -351,14 +345,21 @@ namespace argos {
         public:
             ParamNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
-                  m_mom(config.get<float>("mom", model->config().get<float>("argos.default.mom", 0))),
-                  m_eta(config.get<float>("eta", model->config().get<float>("argos.default.eta", 0.0005))),
-                  m_lambda(config.get<float>("lambda", model->config().get<float>("argos.default.lambda", 0.5))),
-                  m_init(config.get<float>("init", model->config().get<float>("argos.default.init", 0)))
+                  m_mom(config.get<float>("mom", model->config().get<float>("argus.global.mom", 0))),
+                  m_eta(config.get<float>("eta", model->config().get<float>("argus.global.eta", 0.0005))),
+                  m_lambda(config.get<float>("lambda", model->config().get<float>("argus.global.lambda", 0.5))),
+                  m_init(config.get<float>("init", model->config().get<float>("argus.global.init", 0)))
             {
                 vector<size_t> size;
                 size.push_back(config.get<size_t>("size"));
                 resize(size); 
+            }
+
+            void sync (Node const *fromNode) {
+                ParamNode const *from = dynamic_cast<ParamNode const *>(fromNode);
+                BOOST_VERIFY(from);
+                data().sync(from->data());
+                delta().sync(from->delta());
             }
 
             void save (ostream &os) const {
@@ -384,14 +385,14 @@ namespace argos {
                 }
             }
 
-            void predict (Mode mode) {
-                if (mode == MODE_TRAIN) {
+            void predict () {
+                if (mode() == MODE_TRAIN) {
                     data().add_scaled(-m_eta, delta());
                 }
             }
 
-            void preupdate (Mode mode) {
-                if (mode == MODE_TRAIN) {
+            void preupdate () {
+                if (mode() == MODE_TRAIN) {
                     if (m_mom == 0) {   // m_mom has to be 0 for verify mode
                         delta().fill(0);
                     }
@@ -431,7 +432,7 @@ namespace argos {
                 delta().fill(0);
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 if (type() == IMAGE) {
                     Array<>::value_type const *in = m_input->data().addr();
                     for (size_t s = 0; s < m_input_shape[0]; ++s) {
@@ -452,7 +453,7 @@ namespace argos {
                 }
             }
 
-            void update (Mode mode) {
+            void update () {
                 if (type() == IMAGE) {
                     Array<>::value_type *in = m_input->delta().addr();
                     for (size_t s = 0; s < m_input_shape[0]; ++s) {
@@ -569,14 +570,14 @@ namespace argos {
                 BOOST_VERIFY(m_weight->data().size() == m_input_size * m_output_size);
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 data().tile(m_bias->data());
                 blas::gemm<Array<>::value_type>(m_input->data().addr(), m_rows, m_input_size, false,
                            m_weight->data().addr(), m_input_size, m_output_size, false,
                            this->data().addr(), m_rows, m_output_size, 1.0, 1.0);
             }
 
-            void update (Mode mode) {
+            void update () {
                 //cerr << "UPDATE " << name() << endl;
                 // update input data
                 blas::gemm<Array<>::value_type>(this->delta().addr(), m_rows, m_output_size, false,
@@ -676,7 +677,7 @@ namespace argos {
                 set_type(m_input->type());
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 size_t n = m_input->data().size() / m_input_channel;
 #pragma omp parallel for
                 for (size_t i = 0; i < n; ++i) {
@@ -687,7 +688,7 @@ namespace argos {
                 }
             }
 
-            void update (Mode mode) {
+            void update () {
                 size_t samples = m_input->data().size(size_t(0));
 #pragma omp parallel for
                 for (size_t s = 0; s < samples; ++s) {
@@ -751,7 +752,7 @@ namespace argos {
                 }*/
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 Array<>::value_type const *packed = m_input->data().addr();
                 if (type() == IMAGE) {
                     size_t patch_width = m_input->data().walk<2>(packed, m_bin) - packed;
@@ -791,7 +792,7 @@ namespace argos {
                 }
             }
 
-            void update (Mode mode) {
+            void update () {
                 Array<>::value_type *packed = m_input->delta().addr();
                 if (type() == IMAGE) {
                     size_t patch_width = m_input->data().walk<2>(packed, m_bin) - packed;
@@ -846,7 +847,7 @@ namespace argos {
                 set_type(m_input->type());
             }
 
-            void predict (Mode mode) {
+            void predict () {
                 size_t samples = m_input->data().size(size_t(0));
                 size_t sz = m_input->data().size() / samples;
                 Array<>::value_type const *in = m_input->data().addr();
@@ -866,7 +867,7 @@ namespace argos {
                 }
             }
 
-            void update (Mode mode) {
+            void update () {
                 size_t samples = m_input->data().size(size_t(0));
                 size_t sz = m_input->data().size() / samples;
                 Array<>::value_type const *in = m_input->data().addr();
@@ -940,8 +941,8 @@ namespace argos {
                 }
             }
 
-            void predict (Mode mode) {
-                if (mode == MODE_PREDICT) {
+            void predict () {
+                if (mode() == MODE_PREDICT) {
 #pragma omp parallel for
                     for (size_t i = 0; i < m_samples; ++i) {
                         Array<>::value_type const *in = m_input->data().at(i);
@@ -968,7 +969,7 @@ namespace argos {
                 //data().apply(m_input->data(), [](Array<>::value_type &y, Array<>::value_type x){y = F::forward(x);});
             }
 
-            void update (Mode mode) {
+            void update () {
 #pragma omp parallel for
                 for (size_t i = 0; i < m_samples; ++i) {
                     Array<>::value_type *in = m_input->delta().at(i);

@@ -18,7 +18,7 @@ int main (int argc, char *argv[]) {
     unsigned report;
     unsigned snapshot;
     bool check = false;
-    int loglevel = logging::trivial::info;
+    int loglevel; // = logging::trivial::info;
 
     po::options_description desc_visible("General options");
     desc_visible.add_options()
@@ -29,8 +29,7 @@ int main (int argc, char *argv[]) {
     ("maxloop", po::value(&maxloop)->default_value(0), "")
     ("report", po::value(&report)->default_value(100), "")
     ("snapshot", po::value(&snapshot)->default_value(0), "")
-    ("verbose,v", "")
-    ("quiet,V", "")
+    ("level", po::value(&loglevel)->default_value(logging::trivial::info), "")
     ("predict", "")
     ("check", "")
     ;
@@ -54,53 +53,37 @@ int main (int argc, char *argv[]) {
 
     if (vm.count("check")) check = true;
 
-    loglevel += vm.count("quiet");
-    loglevel -= vm.count("verbose");
-
     logging::add_console_log(cerr);
     logging::core::get()->set_filter(logging::trivial::severity >= loglevel);
-
 
     Config config;
     LoadConfig(config_path, &config);
 
-    Model model(config);
+    config.put("argos.global.report", report);
+    config.put("argos.global.snapshot", snapshot);
+    config.put("argos.global.maxloop", maxloop);
+    config.put("argos.global.model", model_path);
+
 
     if (vm.count("predict")) {
+        Model model(config, MODE_PREDICT);
         BOOST_VERIFY(model_path.size());
         model.load(model_path);
         model.predict();
         return 0;
     }
-
-    if (init_path.size()) {
-        model.load(init_path);
-    }
     else {
-        model.init();
-    }
-
-    Plan plan(model, MODE_TRAIN);
-    unsigned loop = 0;
-    for (;;) {
-        plan.run();
-        ++loop;
-        if (report && (loop % report == 0)) {
-            cerr << loop << ' ' << endl;
-            cerr << "\ttrain ";
-            model.report(cerr);
-            cerr << "\ttest ";
-            model.predict(cerr);
+        Model model(config, MODE_TRAIN);
+        if (init_path.size()) {
+            model.load(init_path);
         }
-        if (snapshot && (loop % snapshot == 0)) {
-            if (model_path.size()) {
-                model.save(model_path + "." + lexical_cast<string>(loop / snapshot));
-            }
+        else {
+            model.init();
         }
-        if (maxloop > 0 && loop >= maxloop) break;
-    }
-    if (model_path.size()) {
-        model.save(model_path);
+        model.train();
+        if (model_path.size()) {
+            model.save(model_path);
+        }
     }
     return 0;
 }

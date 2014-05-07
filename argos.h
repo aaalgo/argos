@@ -90,14 +90,13 @@ namespace argos {
             // "tasks" vector below.
             vector<unsigned> outputs;
         };
-        Mode mode;
         bool frozen;
         vector<Task> tasks;
         // mapping TaskId to index to the "tasks" vector.
         map<TaskId, unsigned> lookup;
     public:
         /// Constructor, from model and mode.
-        Plan (Model const &model, Mode m = MODE_PREDICT);
+        Plan (Model const &model);
 
         friend class Deps;
         // A helper class to facilitate adding dependencies.
@@ -176,6 +175,7 @@ namespace argos {
 
 
     /// The abstract node class.
+    /** Node must be constructed with a fixed mode -- the mode of the model. */
     class Node {
     public:
         /// Input/output pins.
@@ -194,7 +194,7 @@ namespace argos {
         map<string, Node *> m_lookup;   // input pin lookup, output pins do not have tags, cannot be looked up.
 
     protected:
-        ///
+        /// Retrieve name from config, and add node with that name as input.
         template <typename TYPE>
         TYPE *findInputAndAdd (string const &configAttr, string const &tag);
 
@@ -213,7 +213,15 @@ namespace argos {
         Node (Model *model, Config const &config);
         virtual ~Node ();
 
+        /// get config with fallback
+        /** First try to get path from config of this node.
+         * If fails, try to get fallback from model config.
+         */
+        template <typename TYPE>
+        TYPE getConfig (string const &path, string const &fallback) const;
+
         Model *model () { return m_model; }
+        Mode mode () const;
         string const &name () const { return m_name; }
         string const &type () const { return m_type; }
         vector<Pin> const &inputs () { return m_inputs; }
@@ -228,7 +236,7 @@ namespace argos {
         }
 
         /// Prepare the node for running, add tasks to plan.
-        virtual void prepare (Mode, Plan *);
+        virtual void prepare (Plan *);
         /// save parameters/status to stream  
         virtual void save (ostream &os) const;
         /// load parameters/status from stream
@@ -237,12 +245,21 @@ namespace argos {
         /// initialize parameters/status.
         /** Before running tasks, either load or init must be called. */
         virtual void init ();
+        /// copy parameters/status from given node.
+        /** The given node must be of the same type and specification.
+         * Equivalent to the following:
+         *   stringstream ss;
+         *   from->save(ss);
+         *   ss.seekg(0);
+         *   load(ss);
+         */ 
+        virtual void sync (Node const *from);
         /// Task method.
-        virtual void predict (Mode mode);
+        virtual void predict ();
         /// Task method.
-        virtual void preupdate (Mode mode);
+        virtual void preupdate ();
         /// Task method.
-        virtual void update (Mode mode);
+        virtual void update ();
     };
 
     /// Within the namespace role are several interfaces that a node can implement.
@@ -265,7 +282,7 @@ namespace argos {
         // Sample input.
         class Input: public Role {
         public:
-            virtual void rewind (Mode mode) = 0;
+            virtual void rewind () = 0;
         };
 
         /// Label input.
@@ -320,32 +337,68 @@ namespace argos {
             }
         };
 
-
         /// Parameter interface.
         class Params: public Role {
         public:
         };
     }
 
-    /// Model.
-    class Model {
-    public:
-        typedef std::mt19937 Random;
-    private:
+    /// Node factory library.
+    class Library {
+        /// Record all modules we have opened.
+        map<string, void *> m_modules;
         /// Factory registry.
         map<string, NodeFactory *> m_fac;
-        void registerFactory (string const &name, NodeFactory *fac) {
-            BOOST_VERIFY(fac);
-            auto r = m_fac.insert(make_pair(name, fac));
-            BOOST_VERIFY(r.second);
-        }
         void cleanupFactories () {
             for (auto &v: m_fac) {
                 delete v.second;
             }
         }
-        void registerAllFactories ();
+        void registerInternalFactories ();
+        void cleanupModules ();
+    public:
+        Library () {
+            registerInternalFactories();
+        }
+        ~Library () {
+            cleanupFactories();
+            cleanupModules();
+        }
+        /// Register a factory.
+        void registerFactory (string const &name, NodeFactory *fac) {
+            BOOST_VERIFY(fac);
+            auto r = m_fac.insert(make_pair(name, fac));
+            BOOST_VERIFY(r.second);
+        }
+        /// Register a default factory implementation for a node class.
+        template <typename T>
+        void registerClass (string const &name) {
+            registerFactory(name, new NodeFactoryImpl<T>);
+        }
+        /// A shared library must export entry function of this type, named "ArgusRegisterLibrary".
+        typedef void (*ArgosRegisterLibraryFunctionType) (Library *);
+        /// Load factories from a shared library.
+        void load (string const &path);
+        /// find a node factory by name.
+        NodeFactory *find (string const &type) {
+            auto it = m_fac.find(type);
+            if (it == m_fac.end()) {
+                throw runtime_error("node type '" + type + "' not found");
+            }
+            return it->second;
+        }
+    };
+
+    /// The library singleton.
+    extern Library library;
+
+    /// Model.
+    class Model {
+    public:
+        typedef std::mt19937 Random;
+    private:
         Config m_config;
+        Mode m_mode;
     protected:
         vector<Node *> m_nodes;
         role::Input *m_input;
@@ -357,8 +410,20 @@ namespace argos {
         Node *findNodeHelper (string const &name);
         Node *createNodeHelper (Config const &config);
     public:
-        Model (Config const &config);
+        Model (Config const &config, Mode mode);
         ~Model ();
+
+        Model (Model const &from, Mode mode): Model(from.config(), mode) {
+        }
+
+        Mode mode () const { return m_mode;}
+
+        void sync (Model const &from) {
+            BOOST_VERIFY(m_nodes.size() == from.m_nodes.size());
+            for (unsigned i = 0; i < m_nodes.size(); ++i) {
+                m_nodes[i]->sync(from.m_nodes[i]);
+            }
+        }
 
         Config const &config () const { return m_config; }
         Random &random () { return m_random; }
@@ -382,19 +447,34 @@ namespace argos {
         void save (string const &path) const;
 
         void predict (ostream &os = cerr);
-        void report (ostream &os= cerr) const;
+        void train (ostream &os = cerr);
+        void report (ostream &os= cerr, bool reset = false);
         void verify (bool dry = false);
 
         friend class Plan;
     };
 
     template <typename TYPE>
-    TYPE *Node::findInputAndAdd (string const &configAttr, string const &tag) {
+    TYPE *Node::findInputAndAdd (string const &configAttr, string const &tag = "") {
         string node_name = m_config.get<string>(configAttr);
         TYPE *node = m_model->findNode<TYPE>(node_name);
         if (node == nullptr) throw 0;
         addInput(node, tag);
         return node;
+    }
+
+    template <typename TYPE>
+    TYPE Node::getConfig (string const &path, string const &fallback) const {
+        try {
+            return m_config.get<TYPE>(path);
+        }
+        catch (...) {
+            return m_model->config().get<TYPE>(fallback);
+        }
+    }
+
+    inline Mode Node::mode () const {
+        return m_model->mode();
     }
 
     class LabelOutputNode: public Node { //, public AccOutput {
@@ -404,12 +484,11 @@ namespace argos {
     public:
         LabelOutputNode (Model *model, Config const &config): Node(model, config)
         {
-            m_label_input = model->findNode<role::LabelInput>(config.get<string>("labels"));
+            m_label_input = model->findNode<role::LabelInput>(config.get<string>("label"));
             BOOST_VERIFY(m_label_input);
         }
         vector<int> const &labels () const { return m_labels; }
     };
-
 }
 
 #endif

@@ -1,23 +1,33 @@
 <argos>
-    <default>
+    <global>
         <mom>0</mom>
         <eta>0.0005</eta>
         <lambda>0.5</lambda>
         <init>0</init>
-    </default>
+    </global>
     <node>
-        <type>svm</type>
-        <name>svm</name>
+        <type>simple</type>
+        <name>input</name>
+        <dim>10752</dim>
         <batch>64</batch>
         <train>101.train</train>
         <test>101.test</test>
+    </node>
+    <node>
+        <type>linear</type>
+        <name>linear</name>
+        <input>input</input>
         <channel>98</channel>
     </node>
     <node>
-        <type>labeltap</type>
-        <name>tap</name>
-        <input>svm</input>
-        <path>101.predict</path>
+        <type>hinge</type>
+        <name>loss</name>
+        <input>linear</input>
+        <label>input</label>
+    </node>
+    <node>
+        <type>eval</type>
+        <input>loss</input>
     </node>
 </argos>
 

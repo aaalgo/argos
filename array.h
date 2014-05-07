@@ -80,6 +80,7 @@ namespace argos {
             init(dim, &size[0]);
         }
 
+
         value_type *at (size_t d1) {
             return &m_data[d1 * m_stride[0]];
         }
@@ -169,6 +170,11 @@ namespace argos {
 
         size_t size () const {
             return m_data.size();
+        }
+
+        void sync (Array<T> const &from) {
+            BOOST_VERIFY(from.size() == size());
+            copy(from.m_data.begin(), from.m_data.end(), m_data.begin());
         }
 
         pair<T *, T *> range () {

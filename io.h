@@ -22,8 +22,8 @@ namespace argos {
                 BOOST_VERIFY(m_input);
             }
 
-            void predict (Mode mode) {
-                if (mode == MODE_PREDICT) {
+            void predict () {
+                if (mode() == MODE_PREDICT) {
                     if (!m_file.is_open()) {
                         m_file.open(path);
                     }
@@ -36,120 +36,101 @@ namespace argos {
         };
 
         class SimpleArrayInputNode: public ArrayNode, public role::LabelInput, public role::Input {
-            class Samples {
-                size_t m_dim;
-                vector<int> m_labels;
-                vector<vector<pair<unsigned, double>>> m_data;
-                vector<unsigned> m_index;
-                bool m_test;
-                size_t m_off;
-            public:
-                Samples (string const &path, bool is_test = false): m_test(is_test), m_off(0) {
-                    cerr << "Loading " << path << "..." << endl;
-                    m_data.clear();
-                    m_labels.clear();
-                    ifstream is(path.c_str());
-                    string line;
-                    m_dim = 0;
-                    while (getline(is, line)) {
-                        istringstream ss(line);
-                        unsigned l, d;
-                        char dummy;
-                        double v;
-                        ss >> l;
-                        if (!ss) continue;
-                        m_labels.push_back(l);
-                        m_data.push_back(vector<pair<unsigned, double>>());
-                        auto &back = m_data.back();
-                        while (ss >> d >> dummy >> v) {
-                            BOOST_VERIFY(dummy == ':');
-                            back.push_back(make_pair(d - 1, v));
-                            if (d > m_dim) m_dim = d;
-                        }
-                    }
-                    m_index.resize(m_labels.size());
-                    for (unsigned i = 0; i < m_index.size(); ++i) m_index[i] = i;
-                    if (!is_test) {
-                        random_shuffle(m_index.begin(), m_index.end());
-                    }
-                }
-
-                size_t dim () const {
-                    return m_dim;
-                }
-
-                void rewind (void) {
-                    m_off = 0;
-                }
-
-                void fill (unsigned batch, unsigned dim, Array<> *data, vector<int> *labels) {
-                    labels->resize(batch);
-                    if (m_off + batch >= m_index.size()) {
-                        if (!m_test) {
-                            random_shuffle(m_index.begin(), m_index.end());
-                            m_off = 0;
-                        }
-                    }
-                    if (m_off >= m_index.size()) {
-                        throw StopIterationException();
-                    }
-                    data->fill(0.0);
-                    std::fill(labels->begin(), labels->end(), -1);
-                    Array<>::value_type *x = data->addr();
-                    for (unsigned b = 0; b < batch; ++b) {
-                        if (m_off >= m_index.size()) {
-                            labels->resize(b);
-                            break;
-                        }
-                        size_t i = m_index[m_off++];
-                        labels->at(b) = m_labels[i];
-                        for (auto p: m_data[i]) {
-                            x[p.first] = p.second;
-                        }
-                        x += dim;
-                    }
-                }
-            };
-
             size_t m_batch;
             size_t m_dim;
-            Samples m_train;
-            Samples m_test;
+            size_t m_off;
             vector<int> m_labels;
+            vector<vector<pair<unsigned, double>>> m_data;
+            vector<unsigned> m_index;
+            vector<int> m_batch_labels;
         public:
             SimpleArrayInputNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
-                  m_batch(config.get<size_t>("batch")), //, model->config().get<size_t>("argos.default.batch"))),
-                  m_train(config.get<string>("train")), //, model->config().get<string>("argos.default.train")), m_dim),
-                  m_test(config.get<string>("test"), true) //, model->config().get<string>("argos.default.test")), m_dim, true)
+                  m_batch(config.get<size_t>("batch")),
+                  m_dim(config.get<unsigned>("dim")),
+                  m_off(0)
             {
-                m_dim = m_train.dim();
-                if (m_test.dim() > m_dim) m_dim = m_test.dim();
+                LOG(debug) << "dim: " << m_dim;
+                LOG(debug) << "batch: " << m_batch;
                 vector<size_t> size{m_batch, m_dim};
                 resize(size);
-                m_labels.resize(m_batch);
+
+                string path;
+                if (mode() == MODE_PREDICT) {
+                    path = config.get<string>("test");
+                }
+                else {
+                    path = config.get<string>("train");
+                }
+
+                cerr << "Loading " << path << "..." << endl;
+                ifstream is(path.c_str());
+                string line;
+                while (getline(is, line)) {
+                    istringstream ss(line);
+                    unsigned l, d;
+                    char dummy;
+                    double v;
+                    ss >> l;
+                    if (!ss) continue;
+                    m_labels.push_back(l);
+                    m_data.push_back(vector<pair<unsigned, double>>());
+                    auto &back = m_data.back();
+                    while (ss >> d >> dummy >> v) {
+                        BOOST_VERIFY(dummy == ':');
+                        back.push_back(make_pair(d - 1, v));
+                        BOOST_VERIFY(d <= m_dim);
+                    }
+                }
+                m_index.resize(m_labels.size());
+                for (unsigned i = 0; i < m_index.size(); ++i) m_index[i] = i;
+                if (mode() != MODE_PREDICT) {
+                    random_shuffle(m_index.begin(), m_index.end());
+                }
             }
 
-            void rewind (Mode mode) {
-                if (mode == MODE_PREDICT) {
-                    m_test.rewind();
+            void rewind () {
+                if (mode() == MODE_PREDICT) {
+                    m_off = 0;
                 }
                 else {
                     BOOST_VERIFY(0);    // for now don't support reset for training
                 }
             }
 
-            void predict (Mode mode) {
-                if (mode == MODE_PREDICT) {
-                    m_test.fill(m_batch, m_dim, &data(), &m_labels);
+            void predict () {
+                m_batch_labels.resize(m_batch);
+                if (m_off + m_batch > m_index.size()) {
+                    if (mode() == MODE_TRAIN) {
+                        random_shuffle(m_index.begin(), m_index.end());
+                        m_off = 0;
+                        BOOST_VERIFY(m_off + m_batch <= m_index.size());
+                    }
                 }
-                else {
-                    m_train.fill(m_batch, m_dim, &data(), &m_labels);
+                if (m_off >= m_index.size()) {
+                    throw StopIterationException();
+                }
+                data().fill(0.0);
+                Array<>::value_type *x = data().addr();
+                for (unsigned b = 0; b < m_batch; ++b) {
+                    if (m_off >= m_index.size()) {
+                        m_batch_labels.resize(b);
+                        break;
+                    }
+                    size_t i = m_index[m_off++];
+                    m_batch_labels[b] = m_labels[i];
+                    for (auto p: m_data[i]) {
+                        if (p.first >= m_dim) {
+                            LOG(error) << "dim exceeds range: " << p.first;
+                        }
+                        x[p.first] = p.second;
+                    }
+                    x += m_dim;
                 }
             }
 
             virtual vector<int> const &labels () const {
-                return m_labels;
+                return m_batch_labels;
             }
         };
     }
