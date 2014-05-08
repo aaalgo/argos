@@ -2,7 +2,7 @@
 #include "node-core.h"
 #include "node-combo.h"
 #include "node-utils.h"
-//#include "node-image.h"
+#include "node-image.h"
 #include "node-cifar.h"
 
 namespace argos {
@@ -37,7 +37,8 @@ namespace argos {
         registerFactory("svm", new combo::SvmNodeFactory);
 
         registerClass<cifar::CifarInputNode>("input-cifar");
-        //registerClass<image::ImageInputNode>("input-image");
+        registerClass<image::ImageInputNode>("image.input");
+        registerClass<image::ImageSampleNode>("image.sample");
     }
 }
 
