@@ -331,11 +331,12 @@ namespace argos {
         };
 
         /// Label input.
+        template <typename T=int>
         class LabelInput: public virtual Role {
         public:
             // for training, the return size should always be the same;
             // for prediction, the number of actual available example is returned.
-            virtual vector<int> const &labels () const = 0;
+            virtual vector<T> const &labels () const = 0;
         };
 
         /// Statistics.
@@ -558,18 +559,19 @@ namespace argos {
         return m_model->mode();
     }
 
+    template <typename T>
     class LabelOutputNode: public Node { //, public AccOutput {
-        role::LabelInput const *m_label_input; 
+        role::LabelInput<T> const *m_label_input; 
     protected:
-        vector<int> m_labels;           // the labels we predict
+        vector<T> m_labels;           // the labels we predict
     public:
         LabelOutputNode (Model *model, Config const &config): Node(model, config)
         {
-            m_label_input = model->findNode<role::LabelInput>(config.get<string>("label"));
+            m_label_input = model->findNode<role::LabelInput<T>>(config.get<string>("label"));
             BOOST_VERIFY(m_label_input);
         }
-        vector<int> const &labels () const { return m_labels; }
-        vector<int> const &inputLabels () const { return m_label_input->labels(); }
+        vector<T> const &labels () const { return m_labels; }
+        vector<T> const &inputLabels () const { return m_label_input->labels(); }
     };
 }
 

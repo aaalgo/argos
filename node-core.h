@@ -121,7 +121,7 @@ namespace argos {
         };
         */
 
-        class MaxScoreOutputNode: public LabelOutputNode
+        class MaxScoreOutputNode: public LabelOutputNode<int>
         {
         protected:
             ArrayNode *m_input;
@@ -256,6 +256,56 @@ namespace argos {
                     dx[l] += -1.0 * left;
                     x += m_stride;
                     dx += m_stride;
+                }
+            }
+        };
+
+        /**
+         * loss = 0.5 | x - t| ^2
+         * d loss/ /dx = x - t 
+         */
+        class RegressionOutputNode: public LabelOutputNode<double>, public role::Loss {
+            ArrayNode *m_input;
+            double m_margin;
+        public:
+            RegressionOutputNode (Model *model, Config const &config) 
+                : LabelOutputNode<double>(model, config),
+                  m_input(findInputAndAdd<ArrayNode>("input", "input")),
+                  m_margin(config.get<double>("margin", 0))
+            {
+                role::Loss::init({"loss", "error"});
+            }
+
+            void predict () {
+                Array<>::value_type const *x = m_input->data().addr();
+                vector<double> const &truth = inputLabels();
+                m_labels.resize(truth.size());
+                for (size_t i = 0; i < truth.size(); ++i) {
+                    m_labels[i] = x[i];
+                    double diff = x[i] - truth[i];
+                    double n2 = diff * diff;
+                    if (std::abs(diff) >= m_margin) {
+                        acc(0)(0.5 * n2);
+                    }
+                    else {
+                        acc(0)(0);
+                    }
+                    acc(1)(n2);
+                }
+            }
+
+            void update () {
+                Array<>::value_type const *x = m_input->data().addr();
+                Array<>::value_type *dx = m_input->delta().addr();
+                vector<double> const &truth = inputLabels();
+                for (size_t i = 0; i < truth.size(); ++i) {
+                    double diff = x[i] - truth[i];
+                    if (std::abs(diff) >= m_margin) {
+                        dx[i] = diff;
+                    }
+                    else {
+                        dx[i] = 0;
+                    }
                 }
             }
         };

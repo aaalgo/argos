@@ -9,15 +9,16 @@ namespace argos {
         using namespace std;
         using namespace argos::core;
 
+        template <typename T>
         class LabelTap: public Node {
-            LabelOutputNode *m_input;
+            LabelOutputNode<T> *m_input;
             string path;
             ofstream m_file;
         public:
             LabelTap (Model *model, Config const &config): Node(model, config),
                 path(config.get<string>("path"))
             {
-                m_input = findInputAndAdd<LabelOutputNode>("input", "input");
+                m_input = findInputAndAdd<LabelOutputNode<T>>("input", "input");
                 BOOST_VERIFY(m_input);
             }
 
@@ -26,20 +27,21 @@ namespace argos {
                     if (!m_file.is_open()) {
                         m_file.open(path);
                     }
-                    vector<int> const &labels = m_input->labels();
-                    for (int l: labels) {
+                    vector<T> const &labels = m_input->labels();
+                    for (T l: labels) {
                         m_file << l << endl;
                     }
                 }
             }
         };
 
-        class LibSvmInputNode: public ArrayNode, public role::LabelInput, public role::BatchInput {
+        template <typename T = int>
+        class LibSvmInputNode: public ArrayNode, public role::LabelInput<T>, public role::BatchInput {
             size_t m_dim;
-            vector<int> m_all_labels;
+            vector<T> m_all_labels;
             vector<vector<pair<unsigned, double>>> m_data;
             vector<unsigned> m_index;
-            vector<int> m_labels;
+            vector<T> m_labels;
         public:
             LibSvmInputNode (Model *model, Config const &config)
                 : ArrayNode(model, config),
@@ -58,7 +60,8 @@ namespace argos {
                 string line;
                 while (getline(is, line)) {
                     istringstream ss(line);
-                    unsigned l, d;
+                    T l;
+                    unsigned d;
                     char dummy;
                     double v;
                     ss >> l;
@@ -95,7 +98,7 @@ namespace argos {
                 });
             }
 
-            virtual vector<int> const &labels () const {
+            virtual vector<T> const &labels () const {
                 return m_labels;
             }
         };

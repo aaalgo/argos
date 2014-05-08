@@ -21,14 +21,16 @@ namespace argos {
         //registerClass<core::GaussianOutputNode>("gaussian");
         registerClass<core::LogPOutputNode>("logp");
         registerClass<core::HingeLossOutputNode>("hinge");
+        registerClass<core::RegressionOutputNode>("regression");
         registerClass<core::WindowNode>("window");
         registerClass<core::PoolNode<core::pool::max>>("max");
         registerClass<core::PoolNode<core::pool::avg>>("avg");
         registerClass<core::PadNode>("pad");
         registerClass<core::SoftMaxNode>("softmax");
         registerClass<core::DropOutNode>("dropout");
-        registerClass<utils::LabelTap>("labeltap");
-        registerClass<utils::LibSvmInputNode>("input-libsvm");
+        registerClass<utils::LabelTap<int>>("labeltap");
+        registerClass<utils::LibSvmInputNode<int>>("input-libsvm");
+        registerClass<utils::LibSvmInputNode<double>>("input-libsvr");
         registerClass<utils::Eval>("eval");
         registerFactory("conv", new combo::ConvNodeFactory);
         registerFactory("global", new combo::GlobalNodeFactory);
