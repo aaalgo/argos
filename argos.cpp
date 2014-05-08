@@ -58,7 +58,7 @@ namespace argos {
         unsigned done = 0;
         vector<unsigned> n_left(n);
         stack<unsigned> ready;
-        
+
         // topologicall sort
         for (unsigned i = 0; i < n; ++i) {
             n_left[i] = tasks[i].inputs.size();
@@ -81,7 +81,7 @@ namespace argos {
                 if (n_left[o] == 0) {
                     ready.push(o);
                 }
-            } 
+            }
             ++done;
         }
         BOOST_VERIFY(done == n);
@@ -261,12 +261,15 @@ namespace argos {
         unsigned maxloop = config().get<unsigned>("argos.global.maxloop", 0);
         string model_path = config().get<string>("argos.global.model", "");
         unsigned loop = 0;
+        boost::timer::cpu_timer timer;
+        double last = timer.elapsed().wall/1e9;
         for (;;) {
             plan.run();
             ++loop;
             if (report && (loop % report == 0)) {
-                os << loop << ' ' << endl;
-                os << "\ttrain ";
+                double now = timer.elapsed().wall/1e9;
+                os << loop << " loop:" << (now - last) << " total:" << now << " " << endl;
+                last = now;
                 this->report(os, true);
                 // run evaluation
                 //clone.sync(*this);
@@ -379,4 +382,3 @@ namespace argos {
         }
     }
 }
-
