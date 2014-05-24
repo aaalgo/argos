@@ -1,6 +1,8 @@
 #ifndef WDONG_ARGOS
 #define WDONG_ARGOS
 
+#include <unistd.h>
+#include <array>
 #include <vector>
 #include <string>
 #include <stdexcept>
@@ -13,10 +15,16 @@
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/count.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 #include <boost/log/trivial.hpp>
 #define LOG(x) BOOST_LOG_TRIVIAL(x)
 
 namespace argos {
+
+    //bool isatty = ::isatty(1);
 
     using namespace std;
     namespace ba = boost::accumulators;
@@ -341,10 +349,22 @@ namespace argos {
 
         /// Statistics.
         class Stat: public virtual Role {
+        public:
+            typedef array<double, 5> Stats;
         protected:
-            typedef ba::accumulator_set<double, ba::stats<ba::tag::mean/*, tag::moment<2>*/>> Acc;
+            typedef ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::min, ba::tag::max, ba::tag::count, ba::tag::variance/*, tag::moment<2>*/>> Acc;
             vector<string> m_names;
             vector<Acc> m_accs;
+
+            Stats stats (Acc const &acc) const {
+                Stats st;
+                st[0] = ba::mean(acc);
+                st[1] = sqrt(ba::variance(acc));
+                st[2] = ba::min(acc);
+                st[3] = ba::max(acc);
+                st[4] = ba::count(acc);
+                return st;
+            }
         public:
             void init (vector<string> const &names) {
                 m_names = names;
@@ -359,10 +379,10 @@ namespace argos {
                 return m_names;
             }
             /// Get the means of statistics.
-            void means (vector<double> *v) const {
+            void means (vector<Stats> *v) const {
                 v->clear();
                 for (auto const &acc: m_accs) {
-                    v->push_back(ba::mean(acc));
+                    v->push_back(stats(acc));
                 }
             }
             Acc &acc (unsigned i) {
@@ -397,11 +417,12 @@ namespace argos {
         class Params: public virtual Role {
         public:
             /// size of parameters.
-            virtual size_t size () const = 0;
+            virtual size_t dim () const = 0;
             /// perturbe parameter with epsilon.
             /** returns old value to be used for rollback.*/
             virtual void perturb (size_t index, double epsilon) = 0;
             virtual double gradient (size_t index) const = 0;
+            virtual double value (size_t index) const = 0;
         };
     }
 
@@ -530,7 +551,10 @@ namespace argos {
             node_name = m_config.get<string>(configAttr, defaul);
         }
         TYPE *node = m_model->findNode<TYPE>(node_name);
-        if (node == nullptr) throw 0;
+        if (node == nullptr) {
+            LOG(error) << "cannot find node " << node_name; 
+            throw 0;
+        }
         addInput(node, tag);
         return node;
     }

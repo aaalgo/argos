@@ -32,12 +32,14 @@ namespace argos {
         registerClass<utils::LibSvmInputNode<int>>("input-libsvm");
         registerClass<utils::LibSvmInputNode<double>>("input-libsvr");
         registerClass<utils::Eval>("eval");
+        registerClass<utils::ArrayStat>("stat");
         registerFactory("conv", new combo::ConvNodeFactory);
         registerFactory("global", new combo::GlobalNodeFactory);
         registerFactory("svm", new combo::SvmNodeFactory);
 
         registerClass<cifar::CifarInputNode>("input-cifar");
         registerClass<image::ImageInputNode>("image.input");
+        registerClass<image::ImageTap>("image.tap");
         registerClass<image::ImageSampleNode>("image.sample");
     }
 }

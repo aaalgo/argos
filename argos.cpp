@@ -300,13 +300,18 @@ namespace argos {
         for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
-            vector<double> cost;
+            vector<role::Stat::Stats> cost;
             stat->means(&cost);
             vector<string> const &names = stat->names();
             os << node->name();
             BOOST_VERIFY(names.size() == cost.size());
             for (unsigned i = 0; i < names.size(); ++i) {
-                os << ' ' << names[i] << ':' << cost[i];
+                os << ' ' << names[i] << ':'; // << cost[i];
+                auto const &c = cost[i];
+                for (unsigned j = 0; j < c.size(); ++j) {
+                    if (j) os << ',';
+                    os << c[j];
+                }
             }
             os << endl;
             if (reset) stat->reset();
@@ -325,7 +330,7 @@ namespace argos {
             node->save(ss);
         }
 
-        size_t n = params->size();
+        size_t n = params->dim();
         vector<size_t> index(n);  // index of parameters to verify
         {   // initialize indices, sample if needed
             for (unsigned i = 0; i < n; ++i) index[i] = i;
@@ -334,6 +339,7 @@ namespace argos {
                 index.resize(sample);
             }
         }
+        vector<double> val(index.size());
         vector<double> grad(index.size());
         vector<double> grad_check(index.size());
         // pass one to compute
@@ -355,6 +361,7 @@ namespace argos {
 #endif
         // get graident
         for (unsigned i = 0; i < index.size(); ++i) {
+            val[i] = params->value(index[i]);
             grad[i] = params->gradient(index[i]);
         }
         cout << "COMPUTING GRADIENTS BY PERTURBATION, BE PATIENT..." << endl;
@@ -375,10 +382,10 @@ namespace argos {
             ++progress;
         }
         cout << "CHECKED " << index.size() << " PARAMETERS." << endl;
-        cout << "INDEX\tTRUE VALUE\tTRAINED VALUE\tABS ERROR\tREL ERROR" << endl;
+        cout << "INDEX\tTRUE VALUE\tTRAINED VALUE\tABS ERROR\tREL ERROR\tVALUE" << endl;
         for (size_t i = 0; i < index.size(); ++i) {
             double err = grad_check[i] - grad[i];
-            cout << index[i] << '\t' << grad_check[i] << '\t' << grad[i] << '\t' << std::abs(err) << '\t' << err/grad[i] << endl;
+            cout << index[i] << '\t' << grad_check[i] << '\t' << grad[i] << '\t' << std::abs(err) << '\t' << err/((grad[i] == 0) ? 1.0: grad[i]) << '\t' << val[i] << endl;
         }
     }
 }

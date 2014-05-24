@@ -131,6 +131,29 @@ namespace argos {
                 }
             }
         };
+
+        class ArrayStat: public Node, public role::Stat {
+            ArrayNode *m_input;
+        public:
+            ArrayStat (Model *model, Config const &config)
+                : Node(model, config),
+                  m_input(findInputAndAdd<ArrayNode>("input", "input"))
+            {
+                  role::Stat::init({"data", "delta"});
+            }
+
+            void predict () {
+                auto &acc0 = acc(0);
+                auto &acc1 = acc(1);
+                Array<>::value_type const *x = m_input->data().addr();
+                Array<>::value_type *dx = m_input->delta().addr();
+                size_t sz = m_input->data().size();
+                for (size_t i = 0; i < sz; ++i) {
+                    acc0(x[i]);
+                    acc1(dx[i]);
+                }
+            }
+        };
     }
 }
 #endif

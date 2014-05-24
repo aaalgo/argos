@@ -55,6 +55,8 @@ int main (int argc, char *argv[]) {
         return 0;
     }
 
+    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+
     logging::add_console_log(cerr);
     logging::core::get()->set_filter(logging::trivial::severity >= loglevel);
 

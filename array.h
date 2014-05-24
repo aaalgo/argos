@@ -133,7 +133,7 @@ namespace argos {
         }
 
         template <unsigned d>
-        value_type const *walk (value_type const *p, size_t o) {
+        value_type const *walk (value_type const *p, size_t o) const {
             return p + o * m_stride[d];
         }
 
@@ -143,7 +143,7 @@ namespace argos {
         }
 
         template <unsigned d>
-        value_type const *walk (value_type const *p) {
+        value_type const *walk (value_type const *p) const {
             return p + m_stride[d];
         }
 

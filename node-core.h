@@ -73,6 +73,7 @@ namespace argos {
             int type () const {
                 return m_type;
             }
+
         };
 
         /*
@@ -471,8 +472,7 @@ namespace argos {
                     }
                 }
             }
-
-            size_t size () const {
+            size_t dim () const {
                 return data().size();
             }
 
@@ -483,6 +483,11 @@ namespace argos {
 
             double gradient (size_t index) const {
                 auto addr = delta().addr();
+                return addr[index];
+            }
+
+            double value (size_t index) const {
+                auto addr = data().addr();
                 return addr[index];
             }
         };
@@ -552,6 +557,7 @@ namespace argos {
                             out = delta().walk<1>(out);
                         }
                     }
+                    BOOST_VERIFY(in == m_input->delta().addr() + m_input->delta().size());
                 }
                 else {
                     BOOST_VERIFY(0);
@@ -964,7 +970,7 @@ namespace argos {
                     if (logp == nullptr) break;
                     //cerr << "OPTIMIZE SOFTMAX + LOGP" << endl;
                     vector<int> const &labels = logp->inputLabels();
-
+                    BOOST_VERIFY(labels.size() == samples);
                     for (size_t i = 0; i < samples; ++i) {
                         for (size_t j = 0; j < sz; ++j) {
                             in_delta[j] += out[j];
