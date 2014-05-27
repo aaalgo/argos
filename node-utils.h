@@ -142,18 +142,31 @@ namespace argos {
                   role::Stat::init({"data", "delta"});
             }
 
-            void predict () {
+            void doStat () {
+                Stat::reset();
                 auto &acc0 = acc(0);
                 auto &acc1 = acc(1);
                 Array<>::value_type const *x = m_input->data().addr();
                 Array<>::value_type *dx = m_input->delta().addr();
                 size_t sz = m_input->data().size();
+                BOOST_VERIFY(sz == m_input->delta().size());
                 for (size_t i = 0; i < sz; ++i) {
                     acc0(x[i]);
                     acc1(dx[i]);
                 }
             }
-        };
+
+            void prepare (Plan *plan) {
+                Node::prepare(plan);
+                auto r = plan->add(this, TASK_USER, std::bind(&ArrayStat::doStat, this));
+                switch (mode()) {
+                    case MODE_TRAIN:
+                        r.add(m_input, TASK_UPDATE);
+                    case MODE_PREDICT:
+                        r.add(m_input, TASK_PREDICT);
+                    }
+                }
+            };
     }
 }
 #endif

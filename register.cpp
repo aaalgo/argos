@@ -27,6 +27,7 @@ namespace argos {
         registerClass<core::PoolNode<core::pool::avg>>("avg");
         registerClass<core::PadNode>("pad");
         registerClass<core::SoftMaxNode>("softmax");
+        registerClass<core::NormalizeNode>("norm");
         registerClass<core::DropOutNode>("dropout");
         registerClass<utils::LabelTap<int>>("labeltap");
         registerClass<utils::LibSvmInputNode<int>>("input-libsvm");

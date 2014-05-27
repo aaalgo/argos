@@ -8,6 +8,7 @@
 #undef timer
 #include <boost/timer/timer.hpp>
 #include "argos.h"
+#include "ccolor.h"
 
 namespace argos {
 
@@ -271,8 +272,6 @@ namespace argos {
                 os << loop << " loop:" << (now - last) << " total:" << now << " " << endl;
                 last = now;
                 this->report(os, true);
-                // run evaluation
-                //clone.sync(*this);
             }
             if (snapshot && (loop % snapshot == 0)) {
                 if (model_path.size()) {
@@ -297,23 +296,25 @@ namespace argos {
     }
 
     void Model::report (ostream &os, bool reset) {
+        ccolor::Filter color(os);
         for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
             vector<role::Stat::Stats> cost;
             stat->means(&cost);
             vector<string> const &names = stat->names();
-            os << node->name();
+            color(ccolor::fore::magenta);
+            os << node->name() << endl;
             BOOST_VERIFY(names.size() == cost.size());
             for (unsigned i = 0; i < names.size(); ++i) {
-                os << ' ' << names[i] << ':'; // << cost[i];
+                color((i & 1) ? ccolor::fore::cyan: ccolor::fore::yellow);
+                os << setw(16) << names[i]; // << ':'; // << cost[i];
                 auto const &c = cost[i];
                 for (unsigned j = 0; j < c.size(); ++j) {
-                    if (j) os << ',';
-                    os << c[j];
+                    os << setw(16) << c[j];
                 }
+                os << endl;
             }
-            os << endl;
             if (reset) stat->reset();
         }
     }
@@ -382,10 +383,11 @@ namespace argos {
             ++progress;
         }
         cout << "CHECKED " << index.size() << " PARAMETERS." << endl;
-        cout << "INDEX\tTRUE VALUE\tTRAINED VALUE\tABS ERROR\tREL ERROR\tVALUE" << endl;
+        cout << setw(16) << "INDEX" << setw(16) << "GRADIENT"
+             << setw(16) << "ESTIMATE" << setw(16) << "ABS ERROR" << setw(16) << "REL ERROR" << setw(16) << "VALUE" << endl;
         for (size_t i = 0; i < index.size(); ++i) {
             double err = grad_check[i] - grad[i];
-            cout << index[i] << '\t' << grad_check[i] << '\t' << grad[i] << '\t' << std::abs(err) << '\t' << err/((grad[i] == 0) ? 1.0: grad[i]) << '\t' << val[i] << endl;
+            cout << setw(16) << index[i] << setw(16) << grad_check[i] << setw(16) << grad[i] << setw(16) << std::abs(err) << setw(16) << err/((grad[i] == 0) ? 1.0: grad[i]) << setw(16) << val[i] << endl;
         }
     }
 }

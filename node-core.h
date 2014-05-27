@@ -467,8 +467,15 @@ namespace argos {
                     else {
                         delta().scale(m_meta->mom());
                     }
+                    // get norm scale
+                    /*
+                    double dl2 = delta().l2();
+                    if (dl2 == 0) return;
+                    double rate = data().l2() / dl2 * m_meta->lambda();
+                    */
                     if (m_meta->lambda()) {
                         delta().add_scaled(m_meta->lambda(), data());
+                        //delta().add_scaled(rate, data());
                     }
                 }
             }
@@ -976,7 +983,8 @@ namespace argos {
                             in_delta[j] += out[j];
                         }
                         int l = labels[i];
-                        //BOOST_VERIFY(l < sz);
+                        BOOST_VERIFY(l < int(sz));
+                        BOOST_VERIFY(l >= 0);
                         if (l < int(sz)) {
                             in_delta[l] -= 1.0;
                         }
@@ -998,6 +1006,59 @@ namespace argos {
                     in_delta += sz;
                     out += sz;
                     out_delta += sz;
+                }
+            }
+        };
+
+        class NormalizeNode: public ArrayNode
+        {
+            ArrayNode *m_input;
+            vector<Array<>::value_type> m_rate;
+            size_t m_samples;
+            size_t m_dim;
+        public:
+            NormalizeNode (Model *model, Config const &config)
+                : ArrayNode(model, config) {
+                m_input = findInputAndAdd<ArrayNode>("input", "input");
+                resize(*m_input);
+                setType(m_input->type());
+                m_samples = data().size(size_t(0));
+                m_dim = data().size() / m_samples;
+                m_rate.resize(m_samples);
+            }
+
+            void predict () {
+                Array<>::value_type const *in = m_input->data().addr();
+                Array<>::value_type *out = data().addr();
+                for (size_t i = 0; i < m_samples; ++i) {
+                    Array<>::value_type sum = 0;
+                    for (size_t j = 0; j < m_dim; ++j) {
+                        sum += in[j] * in[j];;
+                    }
+                    Array<>::value_type r = 1.0 / sqrt(sum / m_dim);
+                    m_rate[i] = r;
+                    for (size_t j = 0; j < m_dim; ++j) {
+                        out[j] = in[j] * r;
+                    }
+                    in += m_dim;
+                    out += m_dim;
+                }
+            }
+
+            void update () {
+                Array<>::value_type const *in = m_input->data().addr();
+                Array<>::value_type *in_delta = m_input->delta().addr();
+                Array<>::value_type const *out = data().addr();
+                Array<>::value_type const *out_delta = delta().addr();
+                for (size_t i = 0; i < m_samples; ++i) {
+                    for (size_t j = 0; j < m_dim; ++j) {
+                        in_delta[j] = out_delta[j] * m_rate[i] * (1.0 - out[j] * out[j] / m_dim);
+                    }
+
+                    in += m_dim;
+                    out += m_dim;
+                    in_delta += m_dim;
+                    out_delta += m_dim;
                 }
             }
         };

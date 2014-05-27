@@ -159,6 +159,14 @@ namespace argos {
             return m_dim;
         }
 
+        double l2 () const {
+            double s = 0;
+            for (auto const &v: m_data) {
+                s += v * v;
+            }
+            return std::sqrt(s);
+        }
+
         void size (vector<size_t> *sz) const {
             sz->resize(m_dim);
             copy(m_size.begin(), m_size.begin() + m_dim, sz->begin());

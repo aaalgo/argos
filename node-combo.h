@@ -60,12 +60,20 @@ namespace argos {
                 {
                     Config cfg;
                     cfg.put("type", config.get<string>("pool.type"));
-                    cfg.put("name", name);
+                    cfg.put("name", name + "_pool");
                     cfg.put("input", name + "_window2");
                     cfg.put("channel", config.get<size_t>("channel"));
                     ArrayNode *pool = model->createNode<ArrayNode>(cfg);
                     BOOST_VERIFY(pool);
-                    return pool;
+                }
+                {
+                    Config cfg;
+                    cfg.put("type", "norm");
+                    cfg.put("name", name);
+                    cfg.put("input", name + "_pool");
+                    ArrayNode *norm = model->createNode<ArrayNode>(cfg);
+                    BOOST_VERIFY(norm);
+                    return norm;
                 }
             }
             virtual bool isa (Node const *node) const {

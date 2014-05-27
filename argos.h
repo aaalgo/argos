@@ -15,6 +15,7 @@
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/moment.hpp>
 #include <boost/accumulators/statistics/count.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
@@ -62,6 +63,7 @@ namespace argos {
         TASK_PREDICT = 1,
         TASK_PREUPDATE = 2,
         TASK_UPDATE = 3,
+        TASK_USER = 4
     };
 
     class Node;
@@ -350,19 +352,20 @@ namespace argos {
         /// Statistics.
         class Stat: public virtual Role {
         public:
-            typedef array<double, 5> Stats;
+            typedef array<double, 6> Stats;
         protected:
-            typedef ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::min, ba::tag::max, ba::tag::count, ba::tag::variance/*, tag::moment<2>*/>> Acc;
+            typedef ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::min, ba::tag::max, ba::tag::count, ba::tag::variance, ba::tag::moment<2>>> Acc;
             vector<string> m_names;
             vector<Acc> m_accs;
 
             Stats stats (Acc const &acc) const {
                 Stats st;
                 st[0] = ba::mean(acc);
-                st[1] = sqrt(ba::variance(acc));
-                st[2] = ba::min(acc);
-                st[3] = ba::max(acc);
-                st[4] = ba::count(acc);
+                st[1] = ba::moment<2>(acc);
+                st[2] = sqrt(ba::variance(acc));
+                st[3] = ba::min(acc);
+                st[4] = ba::max(acc);
+                st[5] = ba::count(acc);
                 return st;
             }
         public:
