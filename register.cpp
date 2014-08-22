@@ -4,6 +4,7 @@
 #include "node-utils.h"
 #include "node-image.h"
 #include "node-cifar.h"
+#include "node-dream.h"
 
 namespace argos {
 
@@ -22,6 +23,7 @@ namespace argos {
         registerClass<core::LogPOutputNode>("logp");
         registerClass<core::HingeLossOutputNode>("hinge");
         registerClass<core::RegressionOutputNode>("regression");
+        registerClass<core::MultiRegressionOutputNode>("multiregression");
         registerClass<core::WindowNode>("window");
         registerClass<core::PoolNode<core::pool::max>>("max");
         registerClass<core::PoolNode<core::pool::avg>>("avg");
@@ -42,6 +44,9 @@ namespace argos {
         registerClass<image::ImageInputNode>("image.input");
         registerClass<image::ImageTap>("image.tap");
         registerClass<image::ImageSampleNode>("image.sample");
+        registerClass<dream::DataNode>("dream.data");
+        registerClass<dream::RankCorrelationNode>("dream.spearman");
+        registerClass<dream::OutputTap>("dream.tap");
     }
 }
 

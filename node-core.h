@@ -8,8 +8,15 @@
 
 namespace argos {
 
-    namespace core {
+    namespace role {
+        class ArrayLabelInput: public virtual Role {
+        public:
+            virtual Array<double> const &labels () const = 0;
+        };
+    }
 
+
+    namespace core {
         class Meta: public Node {
             double m_mom;
             double m_eta;
@@ -291,7 +298,7 @@ namespace argos {
                     else {
                         acc(0)(0);
                     }
-                    acc(1)(n2);
+                    acc(1)(std::abs(diff));
                 }
             }
 
@@ -301,6 +308,78 @@ namespace argos {
                 vector<double> const &truth = inputLabels();
                 for (size_t i = 0; i < truth.size(); ++i) {
                     double diff = x[i] - truth[i];
+                    if (std::abs(diff) >= m_margin) {
+                        dx[i] = diff;
+                    }
+                    else {
+                        dx[i] = 0;
+                    }
+                }
+            }
+        };
+
+        class ArrayOutputNode: public ArrayNode { 
+            role::ArrayLabelInput const *m_label_input; 
+        public:
+            ArrayOutputNode (Model *model, Config const &config): ArrayNode(model, config)
+            {
+                m_label_input = model->findNode<role::ArrayLabelInput>(config.get<string>("label"));
+                BOOST_VERIFY(m_label_input);
+            }
+            Array<double> const &inputLabels () const { return m_label_input->labels(); }
+        };
+
+        class MultiRegressionOutputNode: public ArrayOutputNode, public role::Loss {
+            ArrayNode *m_input;
+            double m_margin;
+        public:
+            MultiRegressionOutputNode (Model *model, Config const &config) 
+                : ArrayOutputNode(model, config),
+                  m_input(findInputAndAdd<ArrayNode>("input", "input")),
+                  m_margin(config.get<double>("margin", 0))
+            {
+                role::Loss::init({"loss", "error"});
+            }
+
+            void predict () {
+                Array<>::value_type const *x = m_input->data().addr();
+                Array<>::value_type const *y = inputLabels().addr();
+                vector<size_t> sz_x;
+                vector<size_t> sz_y;
+                m_input->data().size(&sz_x);
+                inputLabels().size(&sz_y);
+                BOOST_VERIFY(sz_x.size() == 2);
+                BOOST_VERIFY(sz_x == sz_y);
+                unsigned i = 0;
+                for (unsigned row = 0; row < sz_x[0]; ++row) {
+                    double l = 0;
+                    for (unsigned col = 0; col < sz_x[1]; ++col) {
+                        double diff = std::abs(x[i] - y[i]);
+                        ++i;
+                        double n2 = diff * diff;
+                        if (diff >= m_margin) {
+                            l += 0.5 * n2;
+                        }
+                        acc(1)(diff);
+                    }
+                    acc(0)(l);
+                }
+            }
+
+            void update () {
+                Array<>::value_type const *x = m_input->data().addr();
+                Array<>::value_type *dx = m_input->delta().addr();
+                Array<>::value_type const *y = inputLabels().addr();
+                vector<size_t> sz_x;
+                vector<size_t> sz_y;
+                m_input->data().size(&sz_x);
+                inputLabels().size(&sz_y);
+                BOOST_VERIFY(sz_x.size() == 2);
+                BOOST_VERIFY(sz_x == sz_y);
+                size_t total = sz_x[0] * sz_x[1];
+
+                for (size_t i = 0; i < total; ++i) {
+                    double diff = x[i] - y[i];
                     if (std::abs(diff) >= m_margin) {
                         dx[i] = diff;
                     }

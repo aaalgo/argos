@@ -6,15 +6,15 @@ STATIC = -static
 ARCH = -march=corei7
 OPT = -O3 
 OPENMP = -fopenmp
-CFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
-CXXFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I..
-LDFLAGS += $(STATIC)
-LDLIBS += -lopencv_imgproc -lopencv_core -lboost_program_options -lboost_log -lboost_timer -lboost_chrono -lboost_thread -lboost_system -ljpeg -lopenblas-sandybridge-openmp -ldl -lz
+CFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I.. -I/opt/libjpeg-turbo/include -DMEM_SRCDST_SUPPORTED
+CXXFLAGS += $(DEBUG) $(OPT) $(STATIC) $(OPENMP) -Wall -I.. -I/opt/libjpeg-turbo/include -DMEM_SRCDST_SUPPORTED
+LDFLAGS += $(STATIC) -L/opt/libjpeg-turbo/lib
+LDLIBS += -lopencv_imgproc -lopencv_core -lboost_program_options -lboost_log -lboost_timer -lboost_chrono -lboost_thread -lboost_system -lturbojpeg -lopenblas-sandybridge-openmp -ldl -lz
 #LDLIBS += -lboost_program_options -lboost_log -lboost_timer -lboost_chrono -lboost_thread -lboost_system -lopenblas-sandybridge-openmp -ldl
 
 HEADERS = argos.h array.h blas-wrapper.h
-NODE_HEADERS = node-core.h node-utils.h node-combo.h node-image.h
-COMMON = blas-wrapper.o argos.o library.o library.o
+NODE_HEADERS = node-core.h node-utils.h node-combo.h node-image.h node-dream.h
+COMMON = blas-wrapper.o argos.o library.o library.o 
 PROGS = #argos #cifar train predict
 SHARED = argos-basic.so
 
