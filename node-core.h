@@ -80,6 +80,9 @@ namespace argos {
             int type () const {
                 return m_type;
             }
+            void report () const {
+                cerr << name() << ":\t" << data().l2() << "\t" <<  delta().l2() << endl;
+            }
 
         };
 
@@ -332,11 +335,13 @@ namespace argos {
         class MultiRegressionOutputNode: public ArrayOutputNode, public role::Loss {
             ArrayNode *m_input;
             double m_margin;
+            double m_rho;
         public:
             MultiRegressionOutputNode (Model *model, Config const &config) 
                 : ArrayOutputNode(model, config),
                   m_input(findInputAndAdd<ArrayNode>("input", "input")),
-                  m_margin(config.get<double>("margin", 0))
+                  m_margin(config.get<double>("margin", 0)),
+                  m_rho(config.get<double>("rho", 1.0))
             {
                 role::Loss::init({"loss", "error"});
             }
@@ -381,7 +386,7 @@ namespace argos {
                 for (size_t i = 0; i < total; ++i) {
                     double diff = x[i] - y[i];
                     if (std::abs(diff) >= m_margin) {
-                        dx[i] = diff;
+                        dx[i] = diff * m_rho;
                     }
                     else {
                         dx[i] = 0;
@@ -718,6 +723,7 @@ namespace argos {
                     wconfig.put("name", name() + "_weight");
                     wconfig.put("type", "param");
                     wconfig.put("size", m_input_size * m_output_size); 
+                    wconfig.put("meta", config.get<string>("meta", "$meta"));
                     m_weight = model->createNode<ParamNode>(wconfig);
                     BOOST_VERIFY(m_weight);
                 }
@@ -735,6 +741,7 @@ namespace argos {
                     bconfig.put("type", "param");
                     bconfig.put("size", m_output_size);
                     bconfig.put("init", 0);
+                    bconfig.put("meta", config.get<string>("meta", "$meta"));
                     m_bias = model->createNode<ParamNode>(bconfig);
                     BOOST_VERIFY(m_bias);
                 }

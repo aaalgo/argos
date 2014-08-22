@@ -36,6 +36,7 @@ namespace argos {
                     cfg.put("name", name + "_linear");
                     cfg.put("local", 1);
                     cfg.put("channel", config.get<size_t>("channel"));
+                    cfg.put("meta", config.get<string>("meta", "$meta"));
                     LinearNode *linear = model->createNode<LinearNode>(cfg);
                     BOOST_VERIFY(linear);
                 }
@@ -90,6 +91,7 @@ namespace argos {
                     cfg.put("type", "linear");
                     cfg.put("input", config.get<string>("input"));
                     cfg.put("channel", config.get<size_t>("channel"));
+                    cfg.put("meta", config.get<string>("meta", "$meta"));
                     cfg.put("name", name + "_linear");
                     ArrayNode *linear = model->createNode<LinearNode>(cfg);
                     BOOST_VERIFY(linear);

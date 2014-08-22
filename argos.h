@@ -271,6 +271,9 @@ namespace argos {
         virtual void preupdate ();
         /// Task method.
         virtual void update ();
+
+        virtual void report () const {
+        }
     };
 
     /// Within the namespace role are several interfaces that a node can implement.

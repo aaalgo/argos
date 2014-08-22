@@ -111,6 +111,7 @@ namespace argos {
                 vector<size_t> sz{m_rows.size(), m_cols_exp.size() + m_cols_copy.size()};
                 data().resize(sz);
                 delta().resize(sz);
+                delta().fill(0.0);
                 for (unsigned i = 0; i < m_rows.size(); ++i) {
                     Array<>::value_type *x = data().at(i);
                     Array<>::value_type const *x_exp = m_exp.at(i);
@@ -155,6 +156,11 @@ namespace argos {
 
             virtual Array<double> const &labels () const {
                 return m_target;
+            }
+
+            virtual void report () const {
+                ArrayNode::report();
+                cerr << "target:\t" << m_target.l2() << endl;
             }
         };
 

@@ -297,6 +297,9 @@ namespace argos {
 
     void Model::report (ostream &os, bool reset) {
         ccolor::Filter color(os);
+        for (Node *n: m_nodes) {
+            n->report();
+        }
         for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
             BOOST_VERIFY(node);
