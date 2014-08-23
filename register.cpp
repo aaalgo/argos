@@ -18,6 +18,7 @@ namespace argos {
         registerClass<core::FunctionNode<core::function::logistic>>("logistic");
         registerClass<core::ParamNode>("param");
         registerClass<core::LinearNode>("linear");
+        registerClass<core::MultiLinearNode>("multilinear");
         //registerClass<core::InputNode>("input");
         //registerClass<core::GaussianOutputNode>("gaussian");
         registerClass<core::LogPOutputNode>("logp");

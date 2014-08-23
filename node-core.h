@@ -416,6 +416,10 @@ namespace argos {
                     }
                 }
             }
+
+            void report () const {
+                cerr << name() << ":\t" << inputLabels().l2() << "\t" <<  m_input->data().l2() << endl;
+            }
         };
 
         namespace function {
@@ -562,7 +566,14 @@ namespace argos {
 
             void predict () {
                 if (mode() == MODE_TRAIN) {
-                    data().add_scaled(-m_meta->eta(), delta());
+                    double dl2 = delta().l2();
+                    double xl2 = data().l2();
+                    if (m_meta->eta() * xl2 * 10 < dl2) {
+                        data().add_scaled(-m_meta->eta() * xl2 / dl2, delta());
+                    }
+                    else {
+                        data().add_scaled(-m_meta->eta(), delta());
+                    }
                 }
             }
 
@@ -790,6 +801,113 @@ namespace argos {
                 blas::gemm<Array<>::value_type>(m_input->data().addr(), m_rows, m_input_size, true,
                            this->delta().addr(), m_rows, m_output_size, false,
                            m_weight->delta().addr(), m_input_size, m_output_size, 1.0/m_samples, 1.0);
+                m_bias->delta().add_scaled_wrapping(1.0/m_samples, delta());
+            }
+        };
+
+        // global only, no local
+        class MultiLinearNode: public ArrayNode {
+            ArrayNode *m_input;
+            ParamNode *m_weight;
+            ParamNode *m_bias;
+            size_t m_samples;
+            size_t m_input_size;
+            size_t m_fan_in;
+            size_t m_output_size;
+        public:
+            MultiLinearNode (Model *model, Config const &config)
+                : ArrayNode(model, config)
+            {
+                m_input = findInputAndAdd<ArrayNode>("input", "input");
+                m_samples = m_input->data().size(size_t(0));
+                m_input_size = m_input->data().size() / m_samples;
+                m_output_size = config.get<size_t>("channel");
+                BOOST_VERIFY(m_input_size % m_output_size == 0);
+                m_fan_in = m_input_size / m_output_size;
+                vector<size_t> size;
+                size.push_back(m_samples);
+                size.push_back(m_output_size);
+                resize(size);
+
+                m_weight = nullptr;
+                try {
+                    //m_weight = model->findNode<ParamNode>("weight");
+                    m_weight = findInputAndAdd<ParamNode>("weight", "weight");
+                }
+                catch (...) {
+                }
+                if (m_weight == nullptr) {
+                    Config wconfig = config;
+                    wconfig.put("name", name() + "_weight");
+                    wconfig.put("type", "param");
+                    wconfig.put("size", m_input_size); 
+                    wconfig.put("meta", config.get<string>("meta", "$meta"));
+                    m_weight = model->createNode<ParamNode>(wconfig);
+                    BOOST_VERIFY(m_weight);
+                }
+                addInput(m_weight, "weight");
+
+                m_bias = nullptr;
+                try {
+                    m_bias = findInputAndAdd<ParamNode>("bias", "bias");
+                }
+                catch (...) {
+                }
+                if (m_bias == nullptr) {
+                    Config bconfig = config;
+                    bconfig.put("name", name() + "_bias");
+                    bconfig.put("type", "param");
+                    bconfig.put("size", m_output_size);
+                    bconfig.put("init", 0);
+                    bconfig.put("meta", config.get<string>("meta", "$meta"));
+                    m_bias = model->createNode<ParamNode>(bconfig);
+                    BOOST_VERIFY(m_bias);
+                }
+                addInput(m_bias, "bias");
+                BOOST_VERIFY(m_bias->data().size() == m_output_size);
+                BOOST_VERIFY(m_weight->data().size() == m_input_size);
+            }
+
+            void predict () {
+                data().tile(m_bias->data());
+                size_t rows = m_samples * m_output_size;
+                size_t cols = m_fan_in;
+                Array<>::value_type *input = m_input->data().addr();
+                BOOST_VERIFY(rows * cols == m_input->data().size());
+                Array<>::value_type *output = data().addr();
+                Array<>::value_type *weight = m_weight->data().addr();
+                BOOST_VERIFY(cols * m_output_size == m_weight->data().size());
+#pragma omp parallel for
+                for (size_t r = 0; r < rows; ++r) {
+                    Array<>::value_type *i = input + r * cols;
+                    Array<>::value_type *o = output + r;
+                    Array<>::value_type *w = weight + (r % m_output_size) * cols;
+                    for (unsigned d = 0; d < m_fan_in; ++d) {
+                        *o += i[d] * w[d];
+                    }
+                }
+            }
+
+            void update () {
+                size_t rows = m_samples * m_output_size;
+                size_t cols = m_fan_in;
+                Array<>::value_type const *input = m_input->data().addr();
+                Array<>::value_type *input_delta = m_input->delta().addr();
+                Array<>::value_type const *output_delta = delta().addr();
+                Array<>::value_type const *weight = m_weight->data().addr();
+                Array<>::value_type *weight_delta = m_weight->delta().addr();
+//#pragma omp parallel for
+                for (size_t r = 0; r < rows; ++r) {
+                    Array<>::value_type const *i = input + r * cols;
+                    Array<>::value_type *id = input_delta + r * cols;
+                    Array<>::value_type const *od = output_delta + r;
+                    Array<>::value_type const *w = weight + (r % m_output_size) * cols;
+                    Array<>::value_type *wd = weight_delta + (r % m_output_size) * cols;
+                    for (unsigned d = 0; d < cols; ++d) {
+                        id[d] += w[d] * od[0];
+                        wd[d] += i[d] * od[0] / m_samples;
+                    }
+                }
                 m_bias->delta().add_scaled_wrapping(1.0/m_samples, delta());
             }
         };

@@ -161,7 +161,8 @@ namespace argos {
         : m_config(config),
         m_mode(mode),
         m_random(config.get<Random::result_type>("argos.global.seed", 2011)),
-        m_server(config.get<string>("argos.server.address", "127.0.0.1"), config.get<string>("argos.server.port", "8000")) 
+        m_run_server(config.get<int>("argos.server.disable", 0) == 0),
+        m_server(nullptr)
     {
         { // create meta node
             Config cfg;
@@ -271,11 +272,14 @@ namespace argos {
         }
     };
 
-    void Model::setupServer () {
+    void Model::startServer () {
+        m_server = new http::server::server(m_config.get<string>("argos.server.address", "127.0.0.1"), m_config.get<string>("argos.server.port", "8000"));
+        BOOST_VERIFY(m_server);
         for (Node *n: m_nodes) {
             string url = "^/node/" + n->name();
-            m_server.handlers().add(url, new NodeRequestHandler(n));
+            m_server->handlers().add(url, new NodeRequestHandler(n));
         }
+        m_server->async_run();
     }
 
     void Model::train (ostream &os) {
@@ -287,8 +291,9 @@ namespace argos {
         unsigned loop = 0;
         boost::timer::cpu_timer timer;
         double last = timer.elapsed().wall/1e9;
-        setupServer();
-        startServer();
+        if (m_run_server) {
+            startServer();
+        }
         LOG(info) << "Server started.";
         for (;;) {
             plan.run();
@@ -306,7 +311,9 @@ namespace argos {
             }
             if (maxloop > 0 && loop >= maxloop) break;
         }
-        stopServer();
+        if (m_run_server) {
+            stopServer();
+        }
         LOG(info) << "Server stopped.";
     }
 

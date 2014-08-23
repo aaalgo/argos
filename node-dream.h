@@ -84,6 +84,7 @@ namespace argos {
             {
                 string const &dir = m_dir = config.get<string>("dir", ".");
                 LOG(info) << "loading data from " << dir;
+                unsigned maxout = config.get<unsigned>("maxout", 0);
                 vector<string> tmp; // string for row name check
                 if (mode() == MODE_PREDICT) {
                     LoadFile(dir + "/test.expression", &m_exp, &m_rows, &m_cols_exp);
@@ -136,6 +137,9 @@ namespace argos {
 
                     m_all_target.size(&sz);
                     sz[0] = batch;
+                    if (maxout && (maxout < sz[1])) {
+                        sz[1] = maxout;
+                    }
                     m_target.resize(sz);
                 }
             }
@@ -181,7 +185,7 @@ namespace argos {
                         */
                         Array<>::value_type *y = m_target.at(r);
                         Array<>::value_type const *y_in = m_all_target.at(i);
-                        for (unsigned l = 0; l < m_cols_target.size(); ++l) {
+                        for (unsigned l = 0; l < m_target.size(1); ++l) {
                             y[l] = y_in[l];
                         }
                         ++r;

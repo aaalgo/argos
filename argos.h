@@ -505,15 +505,13 @@ namespace argos {
         Node *findNodeHelper (string const &name);
         Node *createNodeHelper (Config const &config);
 
-        http::server::server m_server;
+        bool m_run_server;
+        http::server::server *m_server;
 
-        void setupServer ();
-
-        void startServer () {
-            m_server.async_run();
-        }
+        void startServer ();
         void stopServer () {
-            m_server.wait_stop();
+            m_server->wait_stop();
+            delete m_server;
         }
     public:
         Model (Config const &config, Mode mode);
