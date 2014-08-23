@@ -2,6 +2,8 @@
 #define ARGOS_NODE_CORE
 
 #include <iostream>
+#include <sstream>
+#include <boost/lexical_cast.hpp>
 #include "array.h"
 #include "argos.h"
 #include "blas-wrapper.h"
@@ -84,6 +86,27 @@ namespace argos {
                 cerr << name() << ":\t" << data().l2() << "\t" <<  delta().l2() << endl;
             }
 
+            virtual void handle (http::server::request const &req, http::server::reply &rep) const {
+                rep.status = http::server::reply::ok;
+                ostringstream ss;
+                size_t sz = data().size();
+                size_t samples = data().size(size_t(0));
+                size_t dim = sz / samples;
+                for (unsigned i = 0; i < samples; ++i) {
+                    Array<>::value_type const *x = data().at(i);
+                    for (unsigned j = 0; j < dim; ++j) {
+                        if (j) ss << '\t';
+                        ss << x[j];
+                    }
+                    ss << endl;
+                }
+                rep.content = ss.str();
+                rep.headers.resize(2);
+                rep.headers[0].name = "Content-Length";
+                rep.headers[0].value = boost::lexical_cast<string>(rep.content.size());
+                rep.headers[1].name = "Content-Type";
+                rep.headers[1].value = "text/plain";
+            }
         };
 
         /*

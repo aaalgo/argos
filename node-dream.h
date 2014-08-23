@@ -67,7 +67,7 @@ namespace argos {
             }
         }
 
-        class DataNode: public core::ArrayNode, public role::Input, public role::ArrayLabelInput {
+        class DataNode: public core::ArrayNode, public role::BatchInput, public role::ArrayLabelInput {
             vector<string> m_rows;          // cell lines
             vector<string> m_cols_exp;      // expression feature
             vector<string> m_cols_copy;      // copy number feature
@@ -76,6 +76,7 @@ namespace argos {
             Array<> m_exp;
             Array<> m_copy;
             Array<> m_target;
+            Array<> m_all_target;           // for training
             bool m_done;
         public:
             DataNode (Model *model, Config const &config) 
@@ -98,32 +99,44 @@ namespace argos {
                         m_target.resize(sz);
                         m_target.fill(0);
                     }
+
+                    vector<size_t> sz{m_rows.size(), m_cols_exp.size() /*+ m_cols_copy.size()*/};
+                    data().resize(sz);
+                    delta().resize(sz);
+                    delta().fill(0.0);
+                    for (unsigned i = 0; i < m_rows.size(); ++i) {
+                        Array<>::value_type *x = data().at(i);
+                        Array<>::value_type const *x_exp = m_exp.at(i);
+                        unsigned j = 0;
+                        for (unsigned l = 0; l < m_cols_exp.size(); ++l) {
+                            x[j++] = x_exp[l];
+                        }
+                        /*
+                        Array<>::value_type const *x_copy = m_copy.at(i);
+                        for (unsigned l = 0; l < m_cols_copy.size(); ++l) {
+                            x[j++] = x_copy[l];
+                        }
+                        */
+                        BOOST_VERIFY(j == sz[1]);
+                    }
                 }
                 else {
                     LoadFile(dir + "/train.expression", &m_exp, &m_rows, &m_cols_exp);
                     LoadFile(dir + "/train.copy", &m_copy, &tmp, &m_cols_copy);
                     BOOST_VERIFY(m_rows == tmp);
-                    LoadFile(dir + "/train.target", &m_target, &tmp, &m_cols_target);
+                    LoadFile(dir + "/train.target", &m_all_target, &tmp, &m_cols_target);
                     BOOST_VERIFY(m_rows == tmp);
-                }
-                //unsigned batch = getConfig<unsigned>("batch", "argos.global.batch");
-                //role::BatchInput::init(batch, m_rows.size(), mode());
-                vector<size_t> sz{m_rows.size(), m_cols_exp.size() + m_cols_copy.size()};
-                data().resize(sz);
-                delta().resize(sz);
-                delta().fill(0.0);
-                for (unsigned i = 0; i < m_rows.size(); ++i) {
-                    Array<>::value_type *x = data().at(i);
-                    Array<>::value_type const *x_exp = m_exp.at(i);
-                    Array<>::value_type const *x_copy = m_copy.at(i);
-                    unsigned j = 0;
-                    for (unsigned l = 0; l < m_cols_exp.size(); ++l) {
-                        x[j++] = x_exp[l];
-                    }
-                    for (unsigned l = 0; l < m_cols_copy.size(); ++l) {
-                        x[j++] = x_copy[l];
-                    }
-                    BOOST_VERIFY(j == sz[1]);
+
+                    unsigned batch = getConfig<unsigned>("batch", "argos.global.batch");
+                    role::BatchInput::init(batch, m_rows.size(), mode());
+
+                    vector<size_t> sz{batch, m_cols_exp.size() /*+ m_cols_copy.size()*/};
+                    data().resize(sz);
+                    delta().resize(sz);
+
+                    m_all_target.size(&sz);
+                    sz[0] = batch;
+                    m_target.resize(sz);
                 }
             }
 
@@ -143,15 +156,38 @@ namespace argos {
                 return m_dir;
             }
 
-            virtual void rewind () {
-                m_done = false;
-            }
-
             void predict () {
                 if (mode() == MODE_PREDICT) {
                    if (m_done) throw StopIterationException();
                     m_done = true;
                 }
+                else {
+                    data().fill(0);
+                    delta().fill(0);
+                    m_target.fill(0);
+                    unsigned r = 0;
+                    role::BatchInput::next([this, &r](unsigned i) {
+                        Array<>::value_type *x = data().at(r);
+                        Array<>::value_type const *x_exp = m_exp.at(i);
+                        unsigned j = 0;
+                        for (unsigned l = 0; l < m_cols_exp.size(); ++l) {
+                            x[j++] = x_exp[l];
+                        }
+                        /*
+                        Array<>::value_type const *x_copy = m_copy.at(i);
+                        for (unsigned l = 0; l < m_cols_copy.size(); ++l) {
+                            x[j++] = x_copy[l];
+                        }
+                        */
+                        Array<>::value_type *y = m_target.at(r);
+                        Array<>::value_type const *y_in = m_all_target.at(i);
+                        for (unsigned l = 0; l < m_cols_target.size(); ++l) {
+                            y[l] = y_in[l];
+                        }
+                        ++r;
+                    });
+                }
+
             }
 
             virtual Array<double> const &labels () const {

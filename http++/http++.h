@@ -15,6 +15,8 @@
 #include <set>
 #include <vector>
 #include <string>
+#include <thread>
+#include <future>
 #include <boost/noncopyable.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -271,6 +273,8 @@ private:
 class server
   : private boost::noncopyable
 {
+    std::future<void> future;
+ 
 public:
   /// Construct the server to listen on the specified TCP address and port, and
   /// serve up files from the given directory.
@@ -278,6 +282,14 @@ public:
 
   /// Run the server's io_service loop.
   void run();
+
+  void async_run () {
+      future = std::async(std::launch::async, [this](){this->run();});
+  }
+  void wait_stop () {
+      handle_stop();
+      future.wait();
+  }
 
   request_handler &handlers ();
 

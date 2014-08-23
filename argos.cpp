@@ -157,7 +157,12 @@ namespace argos {
 
     Library library;
 
-    Model::Model (Config const &config, Mode mode): m_config(config), m_mode(mode), m_random(config.get<Random::result_type>("argos.global.seed", 2011)) {
+    Model::Model (Config const &config, Mode mode)
+        : m_config(config),
+        m_mode(mode),
+        m_random(config.get<Random::result_type>("argos.global.seed", 2011)),
+        m_server(config.get<string>("argos.server.address", "127.0.0.1"), config.get<string>("argos.server.port", "8000")) 
+    {
         { // create meta node
             Config cfg;
             cfg.put("type", "meta");
@@ -255,6 +260,24 @@ namespace argos {
         }
     }
 
+    class NodeRequestHandler: public http::server::url_handler {
+        Node *m_node;
+    public:
+        NodeRequestHandler (Node *n): m_node(n) {
+        }
+
+        void handle_request(const http::server::request& req, http::server::reply& rep) {
+            m_node->handle(req, rep);
+        }
+    };
+
+    void Model::setupServer () {
+        for (Node *n: m_nodes) {
+            string url = "^/node/" + n->name();
+            m_server.handlers().add(url, new NodeRequestHandler(n));
+        }
+    }
+
     void Model::train (ostream &os) {
         Plan plan(*this);
         unsigned report = config().get<unsigned>("argos.global.report", 0);
@@ -264,6 +287,9 @@ namespace argos {
         unsigned loop = 0;
         boost::timer::cpu_timer timer;
         double last = timer.elapsed().wall/1e9;
+        setupServer();
+        startServer();
+        LOG(info) << "Server started.";
         for (;;) {
             plan.run();
             ++loop;
@@ -280,6 +306,8 @@ namespace argos {
             }
             if (maxloop > 0 && loop >= maxloop) break;
         }
+        stopServer();
+        LOG(info) << "Server stopped.";
     }
 
     void Model::predict (ostream &os) {

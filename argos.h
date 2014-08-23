@@ -23,6 +23,8 @@
 #include <boost/log/trivial.hpp>
 #define LOG(x) BOOST_LOG_TRIVIAL(x)
 
+#include <http++.h>
+
 namespace argos {
 
     //bool isatty = ::isatty(1);
@@ -274,6 +276,9 @@ namespace argos {
 
         virtual void report () const {
         }
+
+        virtual void handle (http::server::request const &req, http::server::reply &rep) const {
+        }
     };
 
     /// Within the namespace role are several interfaces that a node can implement.
@@ -488,6 +493,7 @@ namespace argos {
     private:
         Config m_config;
         Mode m_mode;
+
     protected:
         vector<Node *> m_nodes;
         role::Input *m_input;
@@ -498,6 +504,17 @@ namespace argos {
 
         Node *findNodeHelper (string const &name);
         Node *createNodeHelper (Config const &config);
+
+        http::server::server m_server;
+
+        void setupServer ();
+
+        void startServer () {
+            m_server.async_run();
+        }
+        void stopServer () {
+            m_server.wait_stop();
+        }
     public:
         Model (Config const &config, Mode mode);
         ~Model ();

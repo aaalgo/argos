@@ -25,12 +25,14 @@ server::server(const std::string& address, const std::string& port)
   // Register to handle the signals that indicate when the server should exit.
   // It is safe to register for the same signal multiple times in a program,
   // provided all registration for the specified signal is made through Asio.
+  /*
   signals_.add(SIGINT);
   signals_.add(SIGTERM);
 #if defined(SIGQUIT)
   signals_.add(SIGQUIT);
 #endif // defined(SIGQUIT)
   signals_.async_wait(boost::bind(&server::handle_stop, this));
+  */
 
   // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
   boost::asio::ip::tcp::resolver resolver(io_service_);
