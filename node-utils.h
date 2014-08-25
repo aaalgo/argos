@@ -106,6 +106,7 @@ namespace argos {
     /// The node evaluates the model periodically in training mode.
         class Eval: public Node {
             /// Clone the model for prediction.
+            ofstream os;
             unique_ptr<Model> m_modelClone;
             unsigned m_period;
             unsigned m_loop;
@@ -120,6 +121,10 @@ namespace argos {
                 if ((mode() == MODE_TRAIN) && (m_period > 0)) {
                     m_modelClone = unique_ptr<Model>(new Model(*model, MODE_PREDICT)); 
                 }
+                string path = config.get<string>("output", "");
+                if (path.size()) {
+                    os.open(path);
+                }
             }
             void predict () {
                 ++m_loop;
@@ -127,7 +132,13 @@ namespace argos {
                     m_modelClone->sync(*model());
                     m_modelClone->predict();
                     cout << "EVAL ";
-                    m_modelClone->report(cout, true);
+                    if (os.is_open()) {
+                        m_modelClone->report(os, true);
+                        os.flush();
+                    }
+                    else {
+                        m_modelClone->report(cout, true);
+                    }
                 }
             }
         };

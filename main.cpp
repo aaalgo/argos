@@ -25,12 +25,12 @@ int main (int argc, char *argv[]) {
     po::options_description desc_visible("General options");
     desc_visible.add_options()
     ("help,h", "produce help message.")
-    ("config", po::value(&config_path), "")
+    ("config", po::value(&config_path)->default_value("argos.xml"), "")
     ("init", po::value(&init_path), "")
-    ("model", po::value(&model_path), "")
-    ("maxloop", po::value(&maxloop)->default_value(0), "")
-    ("report", po::value(&report)->default_value(100), "")
-    ("snapshot", po::value(&snapshot)->default_value(0), "")
+    ("model", po::value(&model_path)->default_value("model"), "")
+    ("maxloop", po::value(&maxloop), "")
+    ("report", po::value(&report), "")
+    ("snapshot", po::value(&snapshot), "")
     ("level", po::value(&loglevel)->default_value(logging::trivial::info), "")
     ("check", po::value(&check), "")
     ("check-epsilon", po::value(&epsilon)->default_value(0.0001), "")
@@ -63,9 +63,15 @@ int main (int argc, char *argv[]) {
     Config config;
     LoadConfig(config_path, &config);
 
-    config.put("argos.global.report", report);
-    config.put("argos.global.snapshot", snapshot);
-    config.put("argos.global.maxloop", maxloop);
+    if (vm.count("report") {
+        config.put("argos.global.report", report);
+    }
+    if (vm.count("snapshot") {
+        config.put("argos.global.snapshot", snapshot);
+    }
+    if (vm.count("maxloop") {
+        config.put("argos.global.maxloop", maxloop);
+    }
     config.put("argos.global.model", model_path);
 
 

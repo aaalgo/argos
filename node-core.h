@@ -82,8 +82,8 @@ namespace argos {
             int type () const {
                 return m_type;
             }
-            void report () const {
-                cerr << name() << ":\t" << data().l2() << "\t" <<  delta().l2() << endl;
+            void report (ostream &os) const {
+                os << name() << ":\tdata/" << data().l2() << "\tdelta/" <<  delta().l2() << endl;
             }
 
             virtual void handle (http::server::request const &req, http::server::reply &rep) const {
@@ -417,8 +417,8 @@ namespace argos {
                 }
             }
 
-            void report () const {
-                cerr << name() << ":\t" << inputLabels().l2() << "\t" <<  m_input->data().l2() << endl;
+            void report (ostream &os) const {
+                os << name() << ":\tlabel/" << inputLabels().l2() << "\tdata/" <<  m_input->data().l2() << endl;
             }
         };
 
@@ -568,6 +568,9 @@ namespace argos {
                 if (mode() == MODE_TRAIN) {
                     double dl2 = delta().l2();
                     double xl2 = data().l2();
+                    if (m_meta->lambda()) {
+                        data().scale(1.0 - m_meta->lambda());
+                    }
                     if (m_meta->eta() * xl2 * 10 < dl2) {
                         data().add_scaled(-m_meta->eta() * xl2 / dl2, delta());
                     }
@@ -591,10 +594,12 @@ namespace argos {
                     if (dl2 == 0) return;
                     double rate = data().l2() / dl2 * m_meta->lambda();
                     */
+                    /*
                     if (m_meta->lambda()) {
                         delta().add_scaled(m_meta->lambda(), data());
                         //delta().add_scaled(rate, data());
                     }
+                    */
                 }
             }
             size_t dim () const {

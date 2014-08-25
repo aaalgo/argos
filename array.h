@@ -200,6 +200,13 @@ namespace argos {
             }
         }
 
+        void add (Array<T> const &b) {
+            BOOST_VERIFY(size() == b.size());
+            for (size_t i = 0; i < m_data.size(); ++i) {
+                m_data[i] += b.m_data[i];
+            }
+        }
+
         void add_diff (Array<T> const &a, Array<T> const &b) {
             BOOST_VERIFY(a.size() == size());
             BOOST_VERIFY(b.size() == size());

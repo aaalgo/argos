@@ -274,7 +274,7 @@ namespace argos {
         /// Task method.
         virtual void update ();
 
-        virtual void report () const {
+        virtual void report (ostream &os) const {
         }
 
         virtual void handle (http::server::request const &req, http::server::reply &rep) const {

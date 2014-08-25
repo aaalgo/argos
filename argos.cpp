@@ -284,7 +284,7 @@ namespace argos {
 
     void Model::train (ostream &os) {
         Plan plan(*this);
-        unsigned report = config().get<unsigned>("argos.global.report", 0);
+        unsigned report = config().get<unsigned>("argos.global.report", 100);
         unsigned snapshot = config().get<unsigned>("argos.global.snapshot", 0);
         unsigned maxloop = config().get<unsigned>("argos.global.maxloop", 0);
         string model_path = config().get<string>("argos.global.model", "");
@@ -333,7 +333,7 @@ namespace argos {
     void Model::report (ostream &os, bool reset) {
         ccolor::Filter color(os);
         for (Node *n: m_nodes) {
-            n->report();
+            n->report(os);
         }
         for (role::Stat *stat: m_stats) {
             Node const *node = dynamic_cast<Node const *>(stat);
