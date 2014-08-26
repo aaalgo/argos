@@ -115,8 +115,8 @@ namespace argos {
                 m_noise_level(config.get<double>("noise", 0))
             {
                 unsigned mask = config.get<unsigned>("mask", 1);
-                unsigned m_do_exp = (mask & 1) ? 1 : 0;
-                unsigned m_do_copy = (mask & 2) ? 1 : 0;
+                m_do_exp = (mask & 1) ? 1 : 0;
+                m_do_copy = (mask & 2) ? 1 : 0;
                 BOOST_VERIFY(mask > 0);
                 string const &dir = m_dir = config.get<string>("dir", ".");
                 LOG(info) << "loading data from " << dir;
@@ -227,6 +227,13 @@ namespace argos {
                 }
             }
 
+            ~DataNode () {
+                if (mode() == MODE_TRAIN && m_noise_level > 0) {
+                    BOOST_VERIFY(m_noise_task.valid());
+                    m_noise_task.wait();
+                }
+            }
+
             Array<> const &target () const {
                 return m_target;
             }
@@ -285,11 +292,10 @@ namespace argos {
                         for (unsigned l = 0; l < m_target.size(1) * 2; ++l) {
                             m[l] = m_in[l];
                         }
-
-
                         ++r;
                     });
                     if (m_noise_level > 0) {
+                        BOOST_VERIFY(m_noise_task.valid());
                         m_noise_task.wait();
                         data().add(m_noise);
                         m_noise_task = std::async(std::launch::async, [this](){this->fill_noise();});

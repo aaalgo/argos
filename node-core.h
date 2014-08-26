@@ -381,6 +381,7 @@ namespace argos {
                 unsigned i = 0;
                 for (unsigned row = 0; row < sz_x[0]; ++row) {
                     double l = 0;
+                    double e = 0;
                     for (unsigned col = 0; col < sz_x[1]; ++col) {
                         double diff = std::abs(x[i] - y[i]);
                         ++i;
@@ -388,9 +389,14 @@ namespace argos {
                         if (diff >= m_margin) {
                             l += 0.5 * n2;
                         }
-                        acc(1)(diff);
+                        e += diff;
                     }
+                    acc(0)(0);
+                    acc(1)(0);
+                    /*
                     acc(0)(l);
+                    acc(1)(e);
+                    */
                 }
             }
 
@@ -571,7 +577,7 @@ namespace argos {
                     if (m_meta->lambda()) {
                         data().scale(1.0 - m_meta->lambda());
                     }
-                    if (m_meta->eta() * xl2 * 10 < dl2) {
+                    if (m_meta->eta() * xl2 < dl2) {
                         data().add_scaled(-m_meta->eta() * xl2 / dl2, delta());
                     }
                     else {

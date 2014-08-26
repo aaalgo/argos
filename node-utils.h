@@ -107,31 +107,35 @@ namespace argos {
         class Eval: public Node {
             /// Clone the model for prediction.
             ofstream os;
-            unique_ptr<Model> m_modelClone;
             unsigned m_period;
             unsigned m_loop;
+            Node *m_root;
         public:
             Eval (Model *model, Config const &config)
                 : Node(model, config),
-                  m_modelClone(nullptr),
                   m_period(config.get<unsigned>("period", 100)),
                   m_loop(0)
             {
-                findInputAndAdd<Node>("input", "input");
-                if ((mode() == MODE_TRAIN) && (m_period > 0)) {
-                    m_modelClone = unique_ptr<Model>(new Model(*model, MODE_PREDICT)); 
-                }
+                m_root = model->findNode<Node>(config.get<string>("root"));
+                BOOST_VERIFY(m_root);
                 string path = config.get<string>("output", "");
                 if (path.size()) {
                     os.open(path);
                 }
             }
-            void predict () {
+            void prepare (Plan *plan) {
+                if (mode() == MODE_TRAIN) {
+                    // add preupdate task
+                    auto deps = plan->add(this, TASK_UPDATE, std::bind(&Node::update, dynamic_cast<Node *>(this)));
+                    deps.add(m_root, TASK_UPDATE);
+                }
+            }
+            void update () {
                 ++m_loop;
                 if ((mode() == MODE_TRAIN) && (m_period > 0) && (m_loop % m_period == 0)) {
+                    unique_ptr<Model> m_modelClone(new Model(*model(), MODE_PREDICT)); 
                     m_modelClone->sync(*model());
                     m_modelClone->predict();
-                    cout << "EVAL ";
                     if (os.is_open()) {
                         m_modelClone->report(os, true);
                         os.flush();

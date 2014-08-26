@@ -42,7 +42,6 @@ int main (int argc, char *argv[]) {
     desc.add(desc_visible);
 
     po::positional_options_description p;
-    p.add("config", 1);
     p.add("model", 1);
 
     po::variables_map vm; 
@@ -63,13 +62,13 @@ int main (int argc, char *argv[]) {
     Config config;
     LoadConfig(config_path, &config);
 
-    if (vm.count("report") {
+    if (vm.count("report")) {
         config.put("argos.global.report", report);
     }
-    if (vm.count("snapshot") {
+    if (vm.count("snapshot")) {
         config.put("argos.global.snapshot", snapshot);
     }
-    if (vm.count("maxloop") {
+    if (vm.count("maxloop")) {
         config.put("argos.global.maxloop", maxloop);
     }
     config.put("argos.global.model", model_path);
@@ -80,6 +79,7 @@ int main (int argc, char *argv[]) {
         BOOST_VERIFY(model_path.size());
         model.load(model_path);
         model.predict();
+        model.report();
         return 0;
     }
     else if (vm.count("check")) {
