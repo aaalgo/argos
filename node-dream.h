@@ -1,6 +1,7 @@
 #ifndef ARGOS_NODE_DREAM
 #define ARGOS_NODE_DREAM
 
+#include <iomanip>
 #include <limits>
 #include <thread>
 
@@ -90,6 +91,7 @@ namespace argos {
             double m_noise_level;
             Array<> m_noise;
             future<void> m_noise_task;
+            double m_margin;
 
             void fill_noise () {
                 std::normal_distribution<Array<>::value_type> normal(0, 1.0);
@@ -112,9 +114,15 @@ namespace argos {
         public:
             DataNode (Model *model, Config const &config) 
                 : ArrayNode(model, config), m_done(false),
-                m_noise_level(config.get<double>("noise", 0))
+                m_noise_level(config.get<double>("noise", 0)),
+                m_margin(config.get<double>("margin", 0)
+                
             {
                 unsigned mask = config.get<unsigned>("mask", 1);
+                bool logscale = (config.get<unsigned>("logscale", 0) != 0);
+                if (logscale) {
+                    cerr << "Applying logscale to data." << endl;
+                }
                 m_do_exp = (mask & 1) ? 1 : 0;
                 m_do_copy = (mask & 2) ? 1 : 0;
                 BOOST_VERIFY(mask > 0);
@@ -165,6 +173,11 @@ namespace argos {
                         }
                         BOOST_VERIFY(j == sz[1]);
                     }
+
+                    if (logscale) {
+                        BOOST_VERIFY(!m_do_copy);
+                        data().apply([](double &y){y = (std::log(y) - 1.0) / 1.75;});
+                    }
                 }
                 else {
                     LoadFile(dir + "/train.expression", &m_exp, &m_rows, &m_cols_exp);
@@ -172,6 +185,11 @@ namespace argos {
                     BOOST_VERIFY(m_rows == tmp);
                     LoadFile(dir + "/train.target", &m_all_target, &tmp, &m_cols_target);
                     BOOST_VERIFY(m_rows == tmp);
+
+                    if (logscale) {
+                        BOOST_VERIFY(!m_do_copy);
+                        m_exp.apply([](double &y){y = (std::log(y) - 1.0) / 1.75;});
+                    }
 
                     unsigned batch = getConfig<unsigned>("batch", "argos.global.batch");
                     role::BatchInput::init(batch, m_rows.size(), mode());
@@ -209,13 +227,16 @@ namespace argos {
                             double lb; //= (rank[j-1].first + rank[j].first) / 2;
                             double ub; // = (rank[j+1].first + rank[j].first) / 2;
                             if (j > 0) {
-                                lb = (rank[j-1].first + rank[j].first) / 2;
+                                double m = (rank[j].first - rank[j-1].first) * (1.0 - m_margin) * 0.5;
+                                lb = rank[j].first - m;//(rank[j-1].first + rank[j].first) / 2;
+
                             }
                             else {
                                 lb = std::numeric_limits<double>::lowest();
                             }
                             if (j < dim - 1) {
-                                ub = (rank[j+1].first + rank[j].first) / 2;
+                                double m = (rank[j+1].first - rank[j].first) * (1.0 - m_margin) * 0.5;
+                                ub = rank[j].first) + m;
                             }
                             else {
                                 ub = std::numeric_limits<double>::max();
@@ -240,6 +261,10 @@ namespace argos {
 
             vector<string> const &rowNames () const {
                 return m_rows;
+            }
+
+            vector<string> const &colNames () const {
+                return m_cols_exp;
             }
 
             vector<string> const &targetColNames () const {
@@ -318,6 +343,84 @@ namespace argos {
             }
         };
 
+        class FeatureSelection: public core::ArrayNode {
+            DataNode const *m_data;
+            vector<vector<unsigned>> m_map; 
+            static const unsigned DIM = 3000;
+        public:
+            FeatureSelection (Model *model, Config const &config)
+                : core::ArrayNode(model, config),
+                m_data(findInputAndAdd<DataNode>("input", "data"))
+            {
+                map<string, unsigned> colsIn;
+                map<string, unsigned> colsOut;
+                {
+                    vector<string> const &cc = m_data->targetColNames();
+                    for (unsigned i = 0; i < cc.size(); ++i) {
+                        colsOut[cc[i]] = i;
+                    }
+                }
+                {
+                    vector<string> const &cc = m_data->colNames();
+                    for (unsigned i = 0; i < cc.size(); ++i) {
+                        colsIn[cc[i]] = i;
+                    }
+                }
+                ifstream is("/home/wdong/src/dream/datasets/GE_train_top");
+                m_map.resize(m_data->targetColNames().size());
+                for (;;) {
+                    string name;
+                    is >> name;
+                    if (!is) break;
+                    auto it = colsOut.find(name);
+                    if (it == colsOut.end()) {
+                        // consume the line
+                        getline(is, name);
+                        continue;
+                    }
+                    vector<unsigned> &v = m_map[it->second];
+                    BOOST_VERIFY(v.empty());
+                    v.resize(DIM);
+                    for (unsigned j = 0; j < DIM; ++j) {
+                        is >> name;
+                        auto it = colsIn.find(name);
+                        BOOST_VERIFY(it != colsIn.end());
+                        v[j] = it->second;
+                    }
+                    BOOST_VERIFY(is);
+                }
+                for (unsigned i = 0; i < m_map.size(); ++i) {
+                    auto &v = m_map[i];
+                    if (v.empty()) {
+                        BOOST_VERIFY(m_data->targetColNames()[i] == "____");
+                        v.resize(DIM);
+                        fill(v.begin(), v.end(), 0);
+                    }
+                    BOOST_VERIFY(v.size() == DIM);
+                }
+                vector<size_t> sz;
+                m_data->data().size(&sz);
+                BOOST_VERIFY(sz.size() == 2);
+                sz[1] = m_data->targetColNames().size();
+                sz.push_back(DIM);
+                resize(sz);
+            }
+
+            void predict () {
+                unsigned samples = data().size(size_t(0));
+                for (unsigned i = 0; i < samples; ++i) {
+                    Array<>::value_type const *x = m_data->data().at(i);
+                    Array<>::value_type *y = data().at(i);
+                    for (auto const &v: m_map) {
+                        for (unsigned j: v) {
+                            y[0] = x[j];
+                            ++y;
+                        }
+                    }
+                }
+            }
+        };
+
         class RankCorrelationNode: public Node, public role::Stat {
             core::ArrayNode *m_input;
             DataNode *m_data;
@@ -359,6 +462,21 @@ namespace argos {
 
             void update () {
             }
+
+            void report (ostream &os) const {
+                vector<role::Stat::Stats> cost;
+                role::Stat::means(&cost);
+                vector<string> const &names = role::Stat::names();
+                BOOST_VERIFY(names.size() == cost.size());
+                for (unsigned i = 0; i < names.size(); ++i) {
+                    os << setw(16) << names[i]; // << ':'; // << cost[i];
+                    auto const &c = cost[i];
+                    for (unsigned j = 0; j < c.size(); ++j) {
+                        os << setw(16) << c[j];
+                    }
+                    os << endl;
+                }
+            }
         };
 
         class OutputTap: public Node {
@@ -384,13 +502,11 @@ namespace argos {
         class RankRegression: public Node, public role::Loss {
             DataNode *m_data;
             core::ArrayNode *m_input;
-            double m_rho;
         public:
             RankRegression (Model *model, Config const &config) 
                 : Node(model, config),
                   m_data(findInputAndAdd<DataNode>("data", "data")),
                   m_input(findInputAndAdd<core::ArrayNode>("input", "input")),
-                  m_rho(config.get<double>("rho", 1.0))
             {
                 role::Loss::init({"loss", "error"});
             }

@@ -11,6 +11,7 @@ namespace logging = boost::log;
 using namespace argos;
 
 int main (int argc, char *argv[]) {
+    vector<string> overrides;
     string config_path;
     string init_path;
     string model_path;
@@ -36,6 +37,7 @@ int main (int argc, char *argv[]) {
     ("check-epsilon", po::value(&epsilon)->default_value(0.0001), "")
     ("check-sample", po::value(&sample)->default_value(10), "")
     ("predict", "")
+    ("override,D", po::value(&overrides), "override configuration.")
     ;
 
     po::options_description desc("Allowed options");
@@ -61,6 +63,15 @@ int main (int argc, char *argv[]) {
 
     Config config;
     LoadConfig(config_path, &config);
+
+    for (string const &D: overrides) {
+        size_t o = D.find("=");
+        if (o == D.npos || o == 0 || o + 1 >= D.size()) {
+            BOOST_VERIFY(0);
+        }
+        config.put<string>(D.substr(0, o), D.substr(o + 1));
+    }
+
 
     if (vm.count("report")) {
         config.put("argos.global.report", report);

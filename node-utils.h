@@ -103,26 +103,42 @@ namespace argos {
             }
         };
 
-    /// The node evaluates the model periodically in training mode.
+        /// The node evaluates the model periodically in training mode.
+        // Be careful! The Eval node in the copied mode will also be run -- in
+        // PREDICT mode.  So PREDICT mode must not do anything, or it will
+        // over-write existing data.
         class Eval: public Node {
             /// Clone the model for prediction.
             ofstream os;
+            string m_report_node;
             unsigned m_period;
             unsigned m_loop;
             Node *m_root;
         public:
             Eval (Model *model, Config const &config)
                 : Node(model, config),
+                  m_report_node(config.get<string>("node", "")),
                   m_period(config.get<unsigned>("period", 100)),
                   m_loop(0)
             {
                 m_root = model->findNode<Node>(config.get<string>("root"));
                 BOOST_VERIFY(m_root);
                 string path = config.get<string>("output", "");
-                if (path.size()) {
-                    os.open(path);
+                if (mode() == MODE_TRAIN) {
+                    if (path.size()) {
+                        os.open(path.c_str());
+                    }
                 }
             }
+
+            ~Eval () {
+                if (mode() == MODE_TRAIN) {
+                    if (os.is_open()) {
+                        os.close();
+                    }
+                }
+            }
+
             void prepare (Plan *plan) {
                 if (mode() == MODE_TRAIN) {
                     // add preupdate task
@@ -130,18 +146,32 @@ namespace argos {
                     deps.add(m_root, TASK_UPDATE);
                 }
             }
+
             void update () {
                 ++m_loop;
                 if ((mode() == MODE_TRAIN) && (m_period > 0) && (m_loop % m_period == 0)) {
                     unique_ptr<Model> m_modelClone(new Model(*model(), MODE_PREDICT)); 
                     m_modelClone->sync(*model());
                     m_modelClone->predict();
-                    if (os.is_open()) {
-                        m_modelClone->report(os, true);
-                        os.flush();
+                    if (m_report_node.size()) {
+                        Node *node = m_modelClone->findNode<Node>(m_report_node);
+                        BOOST_VERIFY(node);
+                        if (os.is_open()) {
+                            node->report(os);
+                            os.flush();
+                        }
+                        else {
+                            node->report(cout);
+                        }
                     }
                     else {
-                        m_modelClone->report(cout, true);
+                        if (os.is_open()) {
+                            m_modelClone->report(os, true);
+                            os.flush();
+                        }
+                        else {
+                            m_modelClone->report(cout, true);
+                        }
                     }
                 }
             }

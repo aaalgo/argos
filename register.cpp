@@ -48,6 +48,7 @@ namespace argos {
         registerClass<dream::DataNode>("dream.data");
         registerClass<dream::RankCorrelationNode>("dream.spearman");
         registerClass<dream::RankRegression>("dream.rankregression");
+        registerClass<dream::FeatureSelection>("dream.selection");
         registerClass<dream::OutputTap>("dream.tap");
     }
 }
